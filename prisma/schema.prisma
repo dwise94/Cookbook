@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Cookbook {
+  id              String   @id @default(cuid())
+  name            String
+  creatorName     String   @default("")
+  passwordHash    String
+  contributeToken String   @unique
+  createdAt       DateTime @default(now())
+  recipes         Recipe[]
+  blocked         BlockedSubmitter[]
+}
+
+model Recipe {
+  id            String   @id @default(cuid())
+  cookbookId    String
+  cookbook      Cookbook @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
+  name          String
+  submitterName String
+  ingredients   String
+  instructions  String
+  editToken     String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BlockedSubmitter {
+  id            String   @id @default(cuid())
+  cookbookId    String
+  cookbook      Cookbook @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
+  submitterName String
+  createdAt     DateTime @default(now())
+
+  @@unique([cookbookId, submitterName])
+}
