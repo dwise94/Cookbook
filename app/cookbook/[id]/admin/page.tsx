@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ShareLinkCard } from "@/components/ShareLinkCard";
+import { PaperSheet } from "@/components/PaperSheet";
 import { parseInstructions, serializeInstructions } from "@/lib/instructions";
 
 type Recipe = {
@@ -43,7 +44,8 @@ export default function AdminPage() {
   });
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
-  const [copiedEditId, setCopiedEditId] = useState<string | null>(null);
+  const [sharingEditId, setSharingEditId] = useState<string | null>(null);
+  const [editShareLoadingId, setEditShareLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -110,6 +112,7 @@ export default function AdminPage() {
     if (!res.ok) return;
     setRecipes((prev) => prev.filter((r) => r.id !== recipeId));
     if (editingId === recipeId) setEditingId(null);
+    if (sharingEditId === recipeId) setSharingEditId(null);
   }
 
   async function blockUser() {
@@ -234,22 +237,34 @@ export default function AdminPage() {
     }
   }
 
-  async function copyEditLink(recipeId: string) {
-    let token = recipes.find((r) => r.id === recipeId)?.editToken;
-    if (!token) {
-      const res = await fetch(`/api/cookbooks/${id}/recipes/${recipeId}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      token = data.editToken;
-      setRecipes((prev) =>
-        prev.map((r) => (r.id === recipeId ? { ...r, editToken: data.editToken } : r))
-      );
+  async function toggleShareEditLink(recipeId: string) {
+    if (sharingEditId === recipeId) {
+      setSharingEditId(null);
+      return;
     }
-    if (!token || !origin) return;
-    const url = `${origin}/recipe/${recipeId}/edit?token=${encodeURIComponent(token)}`;
-    await navigator.clipboard.writeText(url);
-    setCopiedEditId(recipeId);
-    setTimeout(() => setCopiedEditId(null), 2000);
+    setEditShareLoadingId(recipeId);
+    try {
+      let token = recipes.find((r) => r.id === recipeId)?.editToken;
+      if (!token) {
+        const res = await fetch(`/api/cookbooks/${id}/recipes/${recipeId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        token = data.editToken;
+        setRecipes((prev) =>
+          prev.map((r) => (r.id === recipeId ? { ...r, editToken: data.editToken } : r))
+        );
+      }
+      if (!token) return;
+      setSharingEditId(recipeId);
+    } finally {
+      setEditShareLoadingId(null);
+    }
+  }
+
+  function editLinkUrl(recipeId: string) {
+    const token = recipes.find((r) => r.id === recipeId)?.editToken;
+    if (!origin || !token) return "";
+    return `${origin}/recipe/${recipeId}/edit?token=${encodeURIComponent(token)}`;
   }
 
   const readOnlyUrl = origin ? `${origin}/cookbook/${id}` : "";
@@ -258,23 +273,20 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-stone-500 dark:text-stone-400">Loading…</div>
+      <PaperSheet lined={false} className="text-center">
+        <p className="muted">Loading…</p>
+      </PaperSheet>
     );
   }
 
   if (loggedIn === false) {
     return (
-      <div className="max-w-md mx-auto space-y-6">
-        <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">Admin login</h1>
-        <p className="text-stone-600 dark:text-stone-400 text-sm">
-          Enter the password you set when creating this cookbook.
-        </p>
+      <PaperSheet lined={false} className="max-w-md mx-auto space-y-4">
+        <h1 className="paper-title text-2xl text-ink">Admin login</h1>
+        <p className="muted text-sm">Enter the password you set when creating this cookbook.</p>
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label
-              htmlFor="admin-password"
-              className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1"
-            >
+            <label htmlFor="admin-password" className="label">
               Password
             </label>
             <input
@@ -282,65 +294,48 @@ export default function AdminPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="field"
               required
+              autoComplete="current-password"
             />
           </div>
           {loginError && (
-            <p className="text-red-600 dark:text-red-400 text-sm" role="alert">
+            <p className="text-red-700 text-sm" role="alert">
               {loginError}
             </p>
           )}
-          <button
-            type="submit"
-            disabled={loginLoading}
-            className="w-full rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium py-2"
-          >
+          <button type="submit" disabled={loginLoading} className="btn-primary w-full">
             {loginLoading ? "Checking…" : "Log in"}
           </button>
         </form>
         <p className="text-center text-sm">
-          <Link
-            href={`/cookbook/${id}`}
-            className="text-amber-600 dark:text-amber-400 hover:underline"
-          >
+          <Link href={`/cookbook/${id}`} className="text-binding hover:underline">
             Back to cookbook
           </Link>
         </p>
-      </div>
+      </PaperSheet>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <PaperSheet lined={false} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">
-            Admin – {cookbookName}
-          </h1>
-          {creatorName && (
-            <p className="text-stone-500 dark:text-stone-400 text-sm">Created by {creatorName}</p>
-          )}
+          <h1 className="paper-title text-2xl sm:text-3xl text-ink">Admin – {cookbookName}</h1>
+          {creatorName && <p className="muted text-sm">Created by {creatorName}</p>}
         </div>
-        <div className="flex gap-2">
-          <Link
-            href={`/cookbook/${id}`}
-            className="rounded-lg border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 font-medium px-4 py-2 text-sm hover:bg-stone-100 dark:hover:bg-stone-800"
-          >
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Link href={`/cookbook/${id}`} className="btn-secondary text-center text-sm">
             View cookbook
           </Link>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-lg text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 text-sm"
-          >
+          <button type="button" onClick={logout} className="btn-secondary text-sm">
             Log out
           </button>
         </div>
-      </div>
+      </PaperSheet>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100">Share</h2>
+      <section className="space-y-3">
+        <h2 className="font-display text-paper text-xl px-1">Share</h2>
         <ShareLinkCard
           title="Contribute link"
           description="Share this so people can add recipes."
@@ -353,74 +348,64 @@ export default function AdminPage() {
         />
       </section>
 
-      <section>
-        <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100 mb-3">
-          Cookbook name
-        </h2>
-        <div className="flex gap-2 flex-wrap items-start">
+      <PaperSheet lined={false} className="space-y-3">
+        <h2 className="paper-title text-lg text-ink">Cookbook name</h2>
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
             type="text"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
-            className="rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 text-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="field flex-1"
             maxLength={100}
           />
           <button
             type="button"
             onClick={saveCookbookName}
             disabled={nameSaving || editName.trim() === cookbookName}
-            className="rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium px-4 py-2 text-sm"
+            className="btn-primary shrink-0"
           >
             {nameSaving ? "Saving…" : "Save name"}
           </button>
         </div>
         {nameError && (
-          <p className="text-red-600 dark:text-red-400 text-sm mt-1" role="alert">
+          <p className="text-red-700 text-sm" role="alert">
             {nameError}
           </p>
         )}
-      </section>
+      </PaperSheet>
 
-      <section>
-        <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100 mb-3">
-          Block a user
-        </h2>
-        <p className="text-sm text-stone-500 dark:text-stone-400 mb-2">
-          Enter the exact name they use when adding recipes.
-        </p>
-        <div className="flex gap-2 flex-wrap">
+      <PaperSheet lined={false} className="space-y-3">
+        <h2 className="paper-title text-lg text-ink">Block a user</h2>
+        <p className="text-sm muted">Enter the exact name they use when adding recipes.</p>
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
             type="text"
             value={blockName}
             onChange={(e) => setBlockName(e.target.value)}
             placeholder="Submitter name"
-            className="rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 text-sm min-w-[160px] focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="field flex-1"
           />
-          <button
-            type="button"
-            onClick={blockUser}
-            className="rounded-lg bg-stone-700 hover:bg-stone-800 text-white font-medium px-4 py-2 text-sm"
-          >
+          <button type="button" onClick={blockUser} className="btn-secondary shrink-0">
             Block
           </button>
         </div>
         {blockError && (
-          <p className="text-red-600 dark:text-red-400 text-sm mt-1" role="alert">
+          <p className="text-red-700 text-sm" role="alert">
             {blockError}
           </p>
         )}
         {blocked.length > 0 && (
-          <ul className="mt-3 space-y-1">
+          <ul className="space-y-2">
             {blocked.map((b) => (
               <li
                 key={b.submitterName + (b.id || "")}
-                className="flex items-center justify-between rounded border border-stone-200 dark:border-stone-700 px-3 py-2 text-sm"
+                className="flex items-center justify-between rounded-md border border-ink/10 px-3 py-2.5 text-sm"
               >
-                <span className="text-stone-700 dark:text-stone-300">{b.submitterName}</span>
+                <span className="text-ink">{b.submitterName}</span>
                 <button
                   type="button"
                   onClick={() => unblock(b.submitterName)}
-                  className="text-amber-600 dark:text-amber-400 hover:underline"
+                  className="text-binding hover:underline min-h-10 px-2"
                 >
                   Unblock
                 </button>
@@ -428,119 +413,131 @@ export default function AdminPage() {
             ))}
           </ul>
         )}
-      </section>
+      </PaperSheet>
 
-      <section>
-        <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100 mb-3">Recipes</h2>
+      <section className="space-y-3">
+        <h2 className="font-display text-paper text-xl px-1">Recipes</h2>
         {recipes.length === 0 ? (
-          <p className="text-stone-500 dark:text-stone-400 text-sm">No recipes yet.</p>
+          <PaperSheet lined={false}>
+            <p className="muted text-sm">No recipes yet.</p>
+          </PaperSheet>
         ) : (
           <ul className="space-y-3">
             {recipes.map((r) => (
-              <li
-                key={r.id}
-                className="rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-3 space-y-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <span className="font-medium text-stone-800 dark:text-stone-100">{r.name}</span>
-                    <span className="block text-sm text-stone-500 dark:text-stone-400">
-                      by {r.submitterName}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => copyEditLink(r.id)}
-                      className="text-amber-600 dark:text-amber-400 hover:underline text-sm"
-                    >
-                      {copiedEditId === r.id ? "Copied!" : "Copy edit link"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => (editingId === r.id ? setEditingId(null) : startEdit(r.id))}
-                      className="text-stone-700 dark:text-stone-300 hover:underline text-sm"
-                    >
-                      {editingId === r.id ? "Cancel" : "Edit"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteRecipe(r.id)}
-                      className="text-red-600 dark:text-red-400 hover:underline text-sm"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-
-                {editingId === r.id && (
-                  <div className="space-y-3 border-t border-stone-200 dark:border-stone-700 pt-3">
-                    <input
-                      type="text"
-                      value={editForm.name}
-                      onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                      className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 px-3 py-2 text-sm"
-                      placeholder="Recipe name"
-                    />
-                    <textarea
-                      value={editForm.ingredients}
-                      onChange={(e) => setEditForm((f) => ({ ...f, ingredients: e.target.value }))}
-                      rows={3}
-                      className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 px-3 py-2 text-sm resize-y"
-                      placeholder="Ingredients"
-                    />
-                    <div className="space-y-2">
-                      {editForm.steps.map((step, index) => (
-                        <div key={index} className="flex gap-2">
-                          <span className="w-6 text-sm text-stone-500 pt-2">{index + 1}.</span>
-                          <input
-                            type="text"
-                            value={step}
-                            onChange={(e) => {
-                              const next = [...editForm.steps];
-                              next[index] = e.target.value;
-                              setEditForm((f) => ({ ...f, steps: next }));
-                            }}
-                            className="flex-1 rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 px-3 py-2 text-sm"
-                          />
-                          <button
-                            type="button"
-                            disabled={editForm.steps.length <= 1}
-                            onClick={() =>
-                              setEditForm((f) => ({
-                                ...f,
-                                steps: f.steps.filter((_, i) => i !== index),
-                              }))
-                            }
-                            className="text-sm text-red-600 disabled:opacity-40"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
+              <li key={r.id}>
+                <PaperSheet lined={false} className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <span className="font-display text-lg text-ink">{r.name}</span>
+                      <span className="block text-sm muted">by {r.submitterName}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() =>
-                          setEditForm((f) => ({ ...f, steps: [...f.steps, ""] }))
-                        }
-                        className="text-sm text-amber-600 dark:text-amber-400"
+                        onClick={() => toggleShareEditLink(r.id)}
+                        disabled={editShareLoadingId === r.id}
+                        className="btn-secondary text-sm disabled:opacity-50"
                       >
-                        Add step
+                        {editShareLoadingId === r.id
+                          ? "Loading…"
+                          : sharingEditId === r.id
+                            ? "Hide edit link"
+                            : "Share edit link"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => (editingId === r.id ? setEditingId(null) : startEdit(r.id))}
+                        className="btn-secondary text-sm"
+                      >
+                        {editingId === r.id ? "Cancel" : "Edit"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteRecipe(r.id)}
+                        className="rounded-md border border-red-200 text-red-700 font-medium px-3 py-2 text-sm min-h-11"
+                      >
+                        Delete
                       </button>
                     </div>
-                    {editError && (
-                      <p className="text-red-600 dark:text-red-400 text-sm">{editError}</p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={saveEdit}
-                      disabled={editSaving}
-                      className="rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium px-4 py-2 text-sm"
-                    >
-                      {editSaving ? "Saving…" : "Save recipe"}
-                    </button>
                   </div>
-                )}
+
+                  {sharingEditId === r.id && (
+                    <ShareLinkCard
+                      title={`Edit link – ${r.name}`}
+                      description="Give this link or QR to the submitter so they can update their recipe."
+                      url={editLinkUrl(r.id)}
+                    />
+                  )}
+
+                  {editingId === r.id && (
+                    <div className="space-y-3 border-t border-ink/10 pt-3">
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                        className="field"
+                        placeholder="Recipe name"
+                      />
+                      <textarea
+                        value={editForm.ingredients}
+                        onChange={(e) =>
+                          setEditForm((f) => ({ ...f, ingredients: e.target.value }))
+                        }
+                        rows={3}
+                        className="field min-h-[5rem] resize-y"
+                        placeholder="Ingredients"
+                      />
+                      <div className="space-y-2">
+                        {editForm.steps.map((step, index) => (
+                          <div key={index} className="flex gap-2 items-start">
+                            <span className="w-7 h-11 flex items-center justify-center text-sm muted">
+                              {index + 1}.
+                            </span>
+                            <input
+                              type="text"
+                              value={step}
+                              onChange={(e) => {
+                                const next = [...editForm.steps];
+                                next[index] = e.target.value;
+                                setEditForm((f) => ({ ...f, steps: next }));
+                              }}
+                              className="field flex-1"
+                            />
+                            <button
+                              type="button"
+                              disabled={editForm.steps.length <= 1}
+                              onClick={() =>
+                                setEditForm((f) => ({
+                                  ...f,
+                                  steps: f.steps.filter((_, i) => i !== index),
+                                }))
+                              }
+                              className="text-sm text-red-700 disabled:opacity-40 min-h-11 px-2"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setEditForm((f) => ({ ...f, steps: [...f.steps, ""] }))}
+                          className="btn-secondary text-sm"
+                        >
+                          Add step
+                        </button>
+                      </div>
+                      {editError && <p className="text-red-700 text-sm">{editError}</p>}
+                      <button
+                        type="button"
+                        onClick={saveEdit}
+                        disabled={editSaving}
+                        className="btn-primary"
+                      >
+                        {editSaving ? "Saving…" : "Save recipe"}
+                      </button>
+                    </div>
+                  )}
+                </PaperSheet>
               </li>
             ))}
           </ul>

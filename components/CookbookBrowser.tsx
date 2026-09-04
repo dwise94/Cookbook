@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { parseInstructions, serializeInstructions } from "@/lib/instructions";
+import { PaperSheet } from "@/components/PaperSheet";
+import { LegalPad } from "@/components/LegalPad";
 
 type Cookbook = { id: string; name: string; creatorName?: string; recipeCount: number };
 type RecipeListItem = { id: string; name: string; submitterName: string; createdAt: string };
@@ -72,52 +74,61 @@ export function CookbookBrowser({
     setLoading(false);
   }, [cookbook, recipes]);
 
+  useEffect(() => {
+    if (selectedId) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [selectedId]);
+
   if (notFound || !cookbook) {
     return (
-      <div className="text-center py-12">
-        <p className="text-stone-500 dark:text-stone-400">
-          {notFound ? "Cookbook not found." : "Loading…"}
-        </p>
+      <PaperSheet lined={false} className="text-center">
+        <p className="muted">{notFound ? "Cookbook not found." : "Loading…"}</p>
         {notFound && (
-          <Link href="/" className="text-amber-600 dark:text-amber-400 hover:underline mt-2 inline-block">
+          <Link href="/" className="text-binding hover:underline mt-3 inline-block">
             Go home
           </Link>
         )}
-      </div>
+      </PaperSheet>
     );
   }
 
+  const showRecipePane = Boolean(selectedId);
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">
-            {cookbook.name}
-          </h1>
-          <p className="text-stone-500 dark:text-stone-400 text-sm">
-            {cookbook.creatorName && `Created by ${cookbook.creatorName} · `}
-            {cookbook.recipeCount} recipe{cookbook.recipeCount !== 1 ? "s" : ""}
-            {!canSubmit && " · View only"}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            type="search"
-            placeholder="Search recipes…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 text-sm flex-1 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-amber-500"
-          />
-          {canSubmit && (
-            <button
-              type="button"
-              onClick={() => setShowAddForm(true)}
-              className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 text-sm whitespace-nowrap"
-            >
-              Add recipe
-            </button>
-          )}
-        </div>
+    <div className="space-y-4 sm:space-y-6">
+      <div className={showRecipePane ? "hidden md:block" : "block"}>
+        <PaperSheet lined={false} className="space-y-4">
+          <div className="flex flex-col gap-3">
+            <div>
+              <h1 className="paper-title text-2xl sm:text-3xl text-ink">{cookbook.name}</h1>
+              <p className="muted text-sm sm:text-base">
+                {cookbook.creatorName && `Created by ${cookbook.creatorName} · `}
+                {cookbook.recipeCount} recipe{cookbook.recipeCount !== 1 ? "s" : ""}
+                {!canSubmit && " · View only"}
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="search"
+                placeholder="Search recipes…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="field flex-1"
+                enterKeyHint="search"
+              />
+              {canSubmit && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(true)}
+                  className="btn-primary whitespace-nowrap"
+                >
+                  Add recipe
+                </button>
+              )}
+            </div>
+          </div>
+        </PaperSheet>
       </div>
 
       {canSubmit && showAddForm && contributeToken && (
@@ -134,81 +145,94 @@ export function CookbookBrowser({
       )}
 
       {recipes.length === 0 && !loading ? (
-        <p className="text-stone-500 dark:text-stone-400 py-8 text-center">
-          {canSubmit ? "No recipes yet. Add the first one!" : "No recipes yet."}
-        </p>
+        <PaperSheet lined={false}>
+          <p className="muted text-center py-4">
+            {canSubmit ? "No recipes yet. Add the first one!" : "No recipes yet."}
+          </p>
+        </PaperSheet>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ul className="space-y-2">
+          <ul className={`space-y-2 ${showRecipePane ? "hidden md:block" : "block"}`}>
             {recipes.map((r) => (
               <li key={r.id}>
                 <button
                   type="button"
-                  onClick={() => setSelectedId(selectedId === r.id ? null : r.id)}
-                  className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
-                    selectedId === r.id
-                      ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
-                      : "border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800"
-                  }`}
+                  onClick={() => setSelectedId(r.id)}
+                  className={`recipe-list-item ${selectedId === r.id ? "is-active" : ""}`}
                 >
-                  <span className="font-medium text-stone-900 dark:text-stone-100">{r.name}</span>
-                  <span className="block text-sm text-stone-500 dark:text-stone-400">
-                    by {r.submitterName}
-                  </span>
+                  <span className="font-display text-lg text-ink block leading-snug">{r.name}</span>
+                  <span className="block text-sm muted">by {r.submitterName}</span>
                 </button>
               </li>
             ))}
           </ul>
-          <div className="min-h-[200px]">
+
+          <div className={showRecipePane ? "block" : "hidden md:block"}>
             {detail ? (
-              <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-4 sticky top-4">
-                <h2 className="text-xl font-semibold text-stone-800 dark:text-stone-100">
-                  {detail.name}
-                </h2>
-                <p className="text-sm text-stone-500 dark:text-stone-400 mb-4">
-                  by {detail.submitterName}
-                </p>
-                <div className="space-y-3 text-stone-700 dark:text-stone-300">
-                  <div>
-                    <h3 className="text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">
-                      Ingredients
-                    </h3>
-                    <pre className="whitespace-pre-wrap font-sans text-sm">
-                      {detail.ingredients || "—"}
-                    </pre>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">
-                      Instructions
-                    </h3>
-                    {(() => {
-                      const steps = parseInstructions(detail.instructions);
-                      if (steps.length === 0) return <p className="text-sm text-stone-500">—</p>;
-                      return (
-                        <ol className="list-decimal list-inside space-y-2 font-sans text-sm text-stone-700 dark:text-stone-300">
-                          {steps.map((step, i) => (
-                            <li key={i} className="pl-1">
-                              {step}
-                            </li>
-                          ))}
-                        </ol>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
+              <RecipePage
+                detail={detail}
+                onBack={() => setSelectedId(null)}
+                showBack
+              />
             ) : selectedId ? (
-              <div className="rounded-lg border border-stone-200 dark:border-stone-700 p-4 text-stone-500 dark:text-stone-400 text-sm">
-                Loading…
-              </div>
+              <LegalPad>
+                <p className="legal-pad-byline">Loading recipe…</p>
+              </LegalPad>
             ) : (
-              <p className="text-stone-400 dark:text-stone-500 text-sm py-4">
-                Select a recipe to view it.
-              </p>
+              <LegalPad className="hidden md:block">
+                <p className="legal-pad-byline">Select a recipe to open the page.</p>
+              </LegalPad>
             )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function RecipePage({
+  detail,
+  onBack,
+  showBack,
+}: {
+  detail: RecipeDetail;
+  onBack: () => void;
+  showBack: boolean;
+}) {
+  const steps = parseInstructions(detail.instructions);
+
+  return (
+    <div className="space-y-3">
+      {showBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="md:hidden btn-secondary w-full sticky top-[3.25rem] z-30 shadow-md"
+        >
+          ← All recipes
+        </button>
+      )}
+      <LegalPad className="min-h-[70vh] sm:min-h-[28rem]">
+        <h2 className="legal-pad-title">{detail.name}</h2>
+        <p className="legal-pad-byline">by {detail.submitterName}</p>
+
+        <h3 className="legal-pad-section">Ingredients</h3>
+        <pre>{detail.ingredients || "—"}</pre>
+
+        <h3 className="legal-pad-section">Instructions</h3>
+        {steps.length === 0 ? (
+          <p className="legal-pad-byline">—</p>
+        ) : (
+          <ol className="list-none">
+            {steps.map((step, i) => (
+              <li key={i} className="legal-pad-step">
+                <span className="legal-pad-step-num">{i + 1}.</span>
+                <span className="legal-pad-step-text">{step}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </LegalPad>
     </div>
   );
 }
@@ -272,93 +296,78 @@ function AddRecipeForm({
 
   if (editLink) {
     return (
-      <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
-        <p className="font-medium text-stone-800 dark:text-stone-100">Recipe added.</p>
-        <p className="text-sm text-stone-600 dark:text-stone-400">
+      <PaperSheet lined={false} className="space-y-3">
+        <p className="paper-title text-xl text-ink">Recipe added.</p>
+        <p className="text-sm muted">
           Save this link if you want to edit later. The cookbook admin can also send you an edit
           link anytime.
         </p>
-        <div className="flex gap-2">
-          <input
-            readOnly
-            value={editLink}
-            className="flex-1 rounded border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 px-2 py-1.5 text-sm"
-          />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input readOnly value={editLink} className="field flex-1 text-sm" />
           <button
             type="button"
             onClick={() => navigator.clipboard.writeText(editLink)}
-            className="rounded bg-stone-600 hover:bg-stone-700 text-white text-sm px-3"
+            className="btn-primary shrink-0"
           >
             Copy
           </button>
         </div>
-        <button
-          type="button"
-          onClick={onSuccess}
-          className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 text-sm"
-        >
+        <button type="button" onClick={onSuccess} className="btn-primary">
           Done
         </button>
-      </div>
+      </PaperSheet>
     );
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-4">
-      <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100 mb-4">
-        Add a recipe
-      </h2>
+    <PaperSheet lined={false}>
+      <h2 className="paper-title text-xl text-ink mb-4">Add a recipe</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Your name <span className="text-amber-600">*</span>
+          <label className="label">
+            Your name <span className="text-binding">*</span>
           </label>
           <input
             type="text"
             value={submitterName}
             onChange={(e) => setSubmitterName(e.target.value)}
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="field"
             maxLength={80}
             required
+            autoComplete="name"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Recipe name <span className="text-amber-600">*</span>
+          <label className="label">
+            Recipe name <span className="text-binding">*</span>
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="field"
             maxLength={200}
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Ingredients (with measurements)
-          </label>
+          <label className="label">Ingredients (with measurements)</label>
           <textarea
             value={ingredients}
             onChange={(e) => setIngredients(e.target.value)}
             rows={4}
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-y"
+            className="field min-h-[6rem] resize-y"
             maxLength={8000}
             placeholder="e.g. 2 cups flour, 1 tsp salt"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Instructions
-          </label>
-          <p className="text-xs text-stone-500 dark:text-stone-400 mb-2">
-            Add each step in order. You can add or remove steps.
-          </p>
+          <label className="label">Instructions</label>
+          <p className="text-xs muted mb-2">Add each step in order.</p>
           <div className="space-y-2">
             {steps.map((step, index) => (
               <div key={index} className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-6 h-10 flex items-center justify-center text-stone-500 dark:text-stone-400 text-sm font-medium">
+                <span className="flex-shrink-0 w-7 h-11 flex items-center justify-center muted text-sm font-medium">
                   {index + 1}.
                 </span>
                 <input
@@ -370,7 +379,7 @@ function AddRecipeForm({
                     setSteps(next);
                   }}
                   placeholder={`Step ${index + 1}`}
-                  className="flex-1 rounded-lg border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="field flex-1"
                   maxLength={2000}
                 />
                 <button
@@ -380,7 +389,7 @@ function AddRecipeForm({
                     setSteps((prev) => prev.filter((_, i) => i !== index));
                   }}
                   disabled={steps.length <= 1}
-                  className="flex-shrink-0 rounded p-2 text-stone-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40 disabled:pointer-events-none"
+                  className="flex-shrink-0 rounded-md p-2.5 muted hover:text-red-700 disabled:opacity-40"
                   title="Remove step"
                   aria-label="Remove step"
                 >
@@ -394,44 +403,25 @@ function AddRecipeForm({
                 </button>
               </div>
             ))}
-            <button
-              type="button"
-              onClick={() => setSteps((prev) => [...prev, ""])}
-              className="flex items-center gap-1.5 rounded-lg border border-dashed border-stone-300 dark:border-stone-600 text-stone-500 dark:text-stone-400 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 px-3 py-2 text-sm"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
+            <button type="button" onClick={() => setSteps((prev) => [...prev, ""])} className="btn-secondary text-sm">
               Add step
             </button>
           </div>
         </div>
         {error && (
-          <p className="text-red-600 dark:text-red-400 text-sm" role="alert">
+          <p className="text-red-700 text-sm" role="alert">
             {error}
           </p>
         )}
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium py-2 px-4"
-          >
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button type="submit" disabled={loading} className="btn-primary">
             {loading ? "Adding…" : "Add recipe"}
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 font-medium py-2 px-4 hover:bg-stone-100 dark:hover:bg-stone-800"
-          >
+          <button type="button" onClick={onClose} className="btn-secondary">
             Cancel
           </button>
         </div>
       </form>
-    </div>
+    </PaperSheet>
   );
 }

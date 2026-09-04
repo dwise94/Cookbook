@@ -1,9 +1,40 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Caveat, Fraunces, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
+
+const display = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const sans = Source_Sans_3({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const hand = Caveat({
+  subsets: ["latin"],
+  variable: "--font-hand",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Cookbook – Share & collect recipes",
   description: "Create a cookbook, share the link, and let others add and browse recipes.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Cookbook",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#2f453c",
 };
 
 export default function RootLayout({
@@ -12,30 +43,33 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased min-h-screen">
-        <header className="border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50">
-          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
-            <a href="/" className="font-semibold text-lg text-stone-800 dark:text-stone-100">
+    <html lang="en" className={`${display.variable} ${sans.variable} ${hand.variable}`}>
+      <body className="font-sans antialiased min-h-screen min-h-dvh">
+        <header className="safe-pt sticky top-0 z-40 border-b border-black/15 bg-desk-deep/95 backdrop-blur-md">
+          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <a
+              href="/"
+              className="font-display text-xl sm:text-2xl text-paper tracking-tight"
+            >
               Cookbook
             </a>
-            <nav className="flex items-center gap-4">
+            <nav className="flex items-center gap-1 sm:gap-3">
               <a
                 href="/my-cookbooks"
-                className="text-sm font-medium text-stone-600 dark:text-stone-400 hover:underline"
+                className="btn-ghost text-sm sm:text-base whitespace-nowrap"
               >
                 My cookbooks
               </a>
               <a
                 href="/create"
-                className="text-sm font-medium text-amber-700 dark:text-amber-400 hover:underline"
+                className="rounded-md bg-binding hover:bg-binding-hover text-white text-sm sm:text-base font-medium px-3 py-2 min-h-10 inline-flex items-center"
               >
-                Create a cookbook
+                Create
               </a>
             </nav>
           </div>
         </header>
-        <main className="max-w-3xl mx-auto px-4 py-6 sm:py-8">{children}</main>
+        <main className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-8 safe-pb">{children}</main>
       </body>
     </html>
   );

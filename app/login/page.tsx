@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { PaperSheet } from "@/components/PaperSheet";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,17 +45,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto">
-      <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100 mb-2">
-        Find your cookbooks
-      </h1>
-      <p className="text-stone-600 dark:text-stone-400 text-sm mb-6">
-        Log in with the username and password you used when creating your cookbook(s). You’ll see
-        all cookbooks you created with that combination.
+    <PaperSheet lined={false} className="max-w-md mx-auto space-y-4">
+      <h1 className="paper-title text-2xl sm:text-3xl text-ink">Find your cookbooks</h1>
+      <p className="muted text-sm">
+        Log in with the username and password you used when creating your cookbook(s).
       </p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+          <label htmlFor="username" className="label">
             Your username
           </label>
           <input
@@ -63,13 +61,14 @@ export default function LoginPage() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Same as when you created the cookbook"
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="field"
             maxLength={80}
             autoFocus
+            autoComplete="username"
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+          <label htmlFor="password" className="label">
             Password
           </label>
           <input
@@ -78,27 +77,24 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Same as when you created the cookbook"
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="field"
+            autoComplete="current-password"
           />
         </div>
         {error && (
-          <p className="text-red-600 dark:text-red-400 text-sm" role="alert">
+          <p className="text-red-700 text-sm" role="alert">
             {error}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium py-2.5 transition-colors"
-        >
+        <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? "Logging in…" : "Log in"}
         </button>
       </form>
-      <p className="mt-4 text-center text-sm text-stone-500 dark:text-stone-400">
-        <Link href="/" className="hover:underline">
+      <p className="text-center text-sm">
+        <Link href="/" className="text-binding hover:underline">
           Back to home
         </Link>
       </p>
-    </div>
+    </PaperSheet>
   );
 }

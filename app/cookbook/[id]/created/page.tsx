@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ShareLinkCard } from "@/components/ShareLinkCard";
+import { PaperSheet } from "@/components/PaperSheet";
 
 export default function CreatedPage() {
   const params = useParams();
@@ -23,12 +24,14 @@ export default function CreatedPage() {
   const adminUrl = origin ? `${origin}/cookbook/${id}/admin` : "";
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">Cookbook created</h1>
-      <p className="text-stone-600 dark:text-stone-400">
-        <strong>{name}</strong> is ready. Share the contribute link so people can add recipes, or the
-        read-only link so they can only browse.
-      </p>
+    <div className="max-w-lg mx-auto space-y-4">
+      <PaperSheet lined={false} className="space-y-2">
+        <h1 className="paper-title text-2xl sm:text-3xl text-ink">Cookbook created</h1>
+        <p className="muted">
+          <strong className="text-ink">{name}</strong> is ready. Share the contribute link so people
+          can add recipes, or the read-only link so they can only browse.
+        </p>
+      </PaperSheet>
 
       <ShareLinkCard
         title="Contribute link (add recipes)"
@@ -42,31 +45,24 @@ export default function CreatedPage() {
         url={readOnlyUrl}
       />
 
-      <div className="rounded-lg border border-stone-200 dark:border-stone-700 p-4 space-y-2">
-        <h3 className="font-semibold text-stone-800 dark:text-stone-100">Admin</h3>
-        <p className="text-sm text-stone-500 dark:text-stone-400">
+      <PaperSheet lined={false} className="space-y-2">
+        <h3 className="paper-title text-lg text-ink">Admin</h3>
+        <p className="text-sm muted">
           Keep this for yourself. You’ll enter your password to manage the cookbook.
         </p>
-        <input
-          readOnly
-          value={adminUrl}
-          className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-900 px-3 py-2 text-sm"
-        />
-      </div>
+        <input readOnly value={adminUrl} className="field text-sm" />
+      </PaperSheet>
 
-      <div className="flex flex-col sm:flex-row gap-3 pt-2">
+      <div className="flex flex-col sm:flex-row gap-3">
         {contributeToken ? (
           <Link
             href={`/cookbook/${id}/contribute/${contributeToken}`}
-            className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium py-2.5 text-center"
+            className="btn-primary text-center"
           >
             Open contribute page
           </Link>
         ) : null}
-        <Link
-          href={`/cookbook/${id}/admin`}
-          className="rounded-lg border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 font-medium py-2.5 text-center hover:bg-stone-100 dark:hover:bg-stone-800"
-        >
+        <Link href={`/cookbook/${id}/admin`} className="btn-secondary text-center">
           Go to admin
         </Link>
       </div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { parseInstructions, serializeInstructions } from "@/lib/instructions";
+import { PaperSheet } from "@/components/PaperSheet";
 
 function getTokenFromPaste(input: string): string | null {
   const trimmed = input.trim();
@@ -110,9 +111,9 @@ export default function EditRecipePage() {
 
   if (!token) {
     return (
-      <div className="max-w-lg mx-auto space-y-6 py-8">
-        <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">Edit recipe</h1>
-        <p className="text-stone-600 dark:text-stone-400">
+      <PaperSheet lined={false} className="max-w-lg mx-auto space-y-4">
+        <h1 className="paper-title text-2xl text-ink">Edit recipe</h1>
+        <p className="muted">
           Paste the edit link the cookbook admin sent you (or the token from that link).
         </p>
         <form
@@ -133,60 +134,52 @@ export default function EditRecipePage() {
             value={pasteLink}
             onChange={(e) => setPasteLink(e.target.value)}
             placeholder="https://.../recipe/.../edit?token=... or paste token"
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="field text-sm"
           />
           {pasteError && (
-            <p className="text-red-600 dark:text-red-400 text-sm" role="alert">
+            <p className="text-red-700 text-sm" role="alert">
               {pasteError}
             </p>
           )}
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 text-sm"
-            >
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button type="submit" className="btn-primary">
               Open for editing
             </button>
-            <Link
-              href="/"
-              className="rounded-lg border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 font-medium py-2 px-4 text-sm inline-flex items-center hover:bg-stone-100 dark:hover:bg-stone-800"
-            >
+            <Link href="/" className="btn-secondary text-center">
               Cancel
             </Link>
           </div>
         </form>
-        <p className="text-sm text-stone-500 dark:text-stone-400">
+        <p className="text-sm muted">
           Lost your link? Ask the cookbook admin to send you a new edit link.
         </p>
-      </div>
+      </PaperSheet>
     );
   }
 
   if (loading) {
     return (
-      <div className="max-w-lg mx-auto text-center py-12">
-        <p className="text-stone-500 dark:text-stone-400">Loading…</p>
-      </div>
+      <PaperSheet lined={false} className="max-w-lg mx-auto text-center">
+        <p className="muted">Loading…</p>
+      </PaperSheet>
     );
   }
 
   if (forbidden || !recipe) {
     return (
-      <div className="max-w-lg mx-auto text-center py-12">
-        <p className="text-stone-600 dark:text-stone-400">
-          This edit link is invalid. Ask the cookbook admin to send you a new one.
-        </p>
-        <Link href="/" className="text-amber-600 dark:text-amber-400 hover:underline mt-2 inline-block">
+      <PaperSheet lined={false} className="max-w-lg mx-auto text-center space-y-3">
+        <p className="muted">This edit link is invalid. Ask the cookbook admin to send you a new one.</p>
+        <Link href="/" className="text-binding hover:underline inline-block">
           Go home
         </Link>
-      </div>
+      </PaperSheet>
     );
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">Edit recipe</h1>
-      <p className="text-sm text-stone-500 dark:text-stone-400">by {recipe.submitterName}</p>
+    <PaperSheet lined={false} className="max-w-lg mx-auto space-y-4">
+      <h1 className="paper-title text-2xl text-ink">Edit recipe</h1>
+      <p className="text-sm muted">by {recipe.submitterName}</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -195,41 +188,33 @@ export default function EditRecipePage() {
         className="space-y-4"
       >
         <div>
-          <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Recipe name
-          </label>
+          <label className="label">Recipe name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="field"
             maxLength={200}
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Ingredients (with measurements)
-          </label>
+          <label className="label">Ingredients (with measurements)</label>
           <textarea
             value={ingredients}
             onChange={(e) => setIngredients(e.target.value)}
             rows={4}
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-y"
+            className="field min-h-[6rem] resize-y"
             maxLength={8000}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-            Instructions
-          </label>
-          <p className="text-xs text-stone-500 dark:text-stone-400 mb-2">
-            Add each step in order. You can add or remove steps.
-          </p>
+          <label className="label">Instructions</label>
+          <p className="text-xs muted mb-2">Add each step in order.</p>
           <div className="space-y-2">
             {steps.map((step, index) => (
               <div key={index} className="flex gap-2 items-start">
-                <span className="flex-shrink-0 w-6 h-10 flex items-center justify-center text-stone-500 dark:text-stone-400 text-sm font-medium">
+                <span className="flex-shrink-0 w-7 h-11 flex items-center justify-center muted text-sm font-medium">
                   {index + 1}.
                 </span>
                 <input
@@ -241,7 +226,7 @@ export default function EditRecipePage() {
                     setSteps(next);
                   }}
                   placeholder={`Step ${index + 1}`}
-                  className="flex-1 rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="field flex-1"
                   maxLength={2000}
                 />
                 <button
@@ -251,7 +236,7 @@ export default function EditRecipePage() {
                     setSteps((prev) => prev.filter((_, i) => i !== index));
                   }}
                   disabled={steps.length <= 1}
-                  className="flex-shrink-0 rounded p-2 text-stone-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-40 disabled:pointer-events-none"
+                  className="flex-shrink-0 rounded-md p-2.5 muted hover:text-red-700 disabled:opacity-40"
                   title="Remove step"
                   aria-label="Remove step"
                 >
@@ -265,36 +250,25 @@ export default function EditRecipePage() {
                 </button>
               </div>
             ))}
-            <button
-              type="button"
-              onClick={() => setSteps((prev) => [...prev, ""])}
-              className="flex items-center gap-1.5 rounded-lg border border-dashed border-stone-300 dark:border-stone-600 text-stone-500 dark:text-stone-400 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 px-3 py-2 text-sm"
-            >
+            <button type="button" onClick={() => setSteps((prev) => [...prev, ""])} className="btn-secondary text-sm">
               Add step
             </button>
           </div>
         </div>
         {error && (
-          <p className="text-red-600 dark:text-red-400 text-sm" role="alert">
+          <p className="text-red-700 text-sm" role="alert">
             {error}
           </p>
         )}
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium py-2 px-4"
-          >
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button type="submit" disabled={saving} className="btn-primary">
             {saving ? "Saving…" : saved ? "Saved!" : "Save changes"}
           </button>
-          <Link
-            href="/"
-            className="rounded-lg border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 font-medium py-2 px-4 hover:bg-stone-100 dark:hover:bg-stone-800 inline-block"
-          >
+          <Link href="/" className="btn-secondary text-center">
             Back
           </Link>
         </div>
       </form>
-    </div>
+    </PaperSheet>
   );
 }

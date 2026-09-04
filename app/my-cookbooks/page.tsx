@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { PaperSheet } from "@/components/PaperSheet";
 
 type CookbookEntry = { id: string; name: string; recipeCount: number };
 
@@ -31,112 +32,81 @@ export default function MyCookbooksPage() {
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-stone-500 dark:text-stone-400">
-        Loading…
-      </div>
+      <PaperSheet lined={false} className="text-center">
+        <p className="muted">Loading…</p>
+      </PaperSheet>
     );
   }
 
   if (cookbooks.length === 0) {
     return (
-      <div className="max-w-md mx-auto text-center space-y-4">
-        <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">
-          My cookbooks
-        </h1>
-        <p className="text-stone-600 dark:text-stone-400">
+      <PaperSheet lined={false} className="max-w-md mx-auto text-center space-y-4">
+        <h1 className="paper-title text-2xl text-ink">My cookbooks</h1>
+        <p className="muted">
           {creatorUsername === null
             ? "Log in to see cookbooks you’ve created."
             : "You don’t have any cookbooks yet, or none match the username and password you used to log in."}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           {creatorUsername === null ? (
-            <Link
-              href="/login"
-              className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 inline-block"
-            >
+            <Link href="/login" className="btn-primary">
               Log in
             </Link>
           ) : (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-lg border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 font-medium px-4 py-2"
-            >
+            <button type="button" onClick={handleLogout} className="btn-secondary">
               Log out
             </button>
           )}
-          <Link
-            href="/create"
-            className="rounded-lg border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 font-medium px-4 py-2 inline-block hover:bg-stone-100 dark:hover:bg-stone-800"
-          >
+          <Link href="/create" className="btn-secondary">
             Create a cookbook
           </Link>
         </div>
         <p className="text-sm">
-          <Link href="/" className="text-amber-600 dark:text-amber-400 hover:underline">
+          <Link href="/" className="text-binding hover:underline">
             Back to home
           </Link>
         </p>
-      </div>
+      </PaperSheet>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-4">
+      <PaperSheet lined={false} className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">
-            My cookbooks
-          </h1>
-          {creatorUsername && (
-            <p className="text-stone-500 dark:text-stone-400 text-sm">
-              Logged in as {creatorUsername}
-            </p>
-          )}
+          <h1 className="paper-title text-2xl sm:text-3xl text-ink">My cookbooks</h1>
+          {creatorUsername && <p className="muted text-sm">Logged in as {creatorUsername}</p>}
         </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="rounded-lg border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 font-medium px-4 py-2 text-sm hover:bg-stone-100 dark:hover:bg-stone-800"
-        >
+        <button type="button" onClick={handleLogout} className="btn-secondary text-sm">
           Log out
         </button>
-      </div>
+      </PaperSheet>
 
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {cookbooks.map((c) => (
-          <li
-            key={c.id}
-            className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 overflow-hidden"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <li key={c.id}>
+            <PaperSheet lined={false} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="font-semibold text-stone-800 dark:text-stone-100">{c.name}</h2>
-                <p className="text-sm text-stone-500 dark:text-stone-400">
+                <h2 className="font-display text-xl text-ink">{c.name}</h2>
+                <p className="text-sm muted">
                   {c.recipeCount} recipe{c.recipeCount !== 1 ? "s" : ""}
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Link
-                  href={`/cookbook/${c.id}`}
-                  className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 text-sm"
-                >
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Link href={`/cookbook/${c.id}`} className="btn-primary text-center">
                   Open
                 </Link>
-                <Link
-                  href={`/cookbook/${c.id}/admin`}
-                  className="rounded-lg border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 font-medium px-4 py-2 text-sm hover:bg-stone-100 dark:hover:bg-stone-800"
-                >
+                <Link href={`/cookbook/${c.id}/admin`} className="btn-secondary text-center">
                   Admin
                 </Link>
               </div>
-            </div>
+            </PaperSheet>
           </li>
         ))}
       </ul>
 
-      <p className="text-sm">
-        <Link href="/create" className="text-amber-600 dark:text-amber-400 hover:underline">
+      <p className="text-center sm:text-left">
+        <Link href="/create" className="text-paper hover:underline text-sm font-medium">
           Create another cookbook
         </Link>
       </p>
