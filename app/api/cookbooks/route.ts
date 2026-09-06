@@ -71,12 +71,15 @@ export async function POST(request: Request) {
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
     console.error("Create cookbook error:", err.message, err);
-    const message =
-      process.env.NODE_ENV === "development"
-        ? err.message
-        : "Failed to create cookbook.";
+    const prismaCode =
+      e && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : undefined;
     return NextResponse.json(
-      { error: "Failed to create cookbook.", details: process.env.NODE_ENV === "development" ? err.message : undefined },
+      {
+        error: "Failed to create cookbook.",
+        // Helps diagnose production DB misconfig without a local console
+        details: err.message,
+        code: prismaCode,
+      },
       { status: 500 }
     );
   }
