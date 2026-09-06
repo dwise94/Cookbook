@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAdminCookbookId } from "@/lib/auth";
+import { getAdminCookbookId, getCreatorPayload } from "@/lib/auth";
 
 const NAME_MAX = 100;
 
@@ -24,14 +24,16 @@ export async function GET(
   }
 
   const adminId = await getAdminCookbookId();
-  const isAdmin = adminId === id;
+  const creator = await getCreatorPayload();
+  const isOwner =
+    adminId === id || (creator !== null && creator.cookbookIds.includes(id));
 
   return NextResponse.json({
     id: cookbook.id,
     name: cookbook.name,
     creatorName: cookbook.creatorName,
     recipeCount: cookbook._count.recipes,
-    ...(isAdmin ? { contributeToken: cookbook.contributeToken } : {}),
+    ...(isOwner ? { contributeToken: cookbook.contributeToken, canSubmit: true } : {}),
   });
 }
 

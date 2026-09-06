@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
 import type { Prisma } from "@prisma/client";
+import { getAdminCookbookId, getCreatorPayload } from "@/lib/auth";
 
 const SUBMITTER_NAME_MAX = 80;
 const RECIPE_NAME_MAX = 200;
@@ -77,7 +78,15 @@ export async function POST(
       ? ((body as Record<string, unknown>).contributeToken as string)
       : request.headers.get("x-contribute-token") ?? "";
 
-  if (!contributeToken || contributeToken !== cookbook.contributeToken) {
+  const adminId = await getAdminCookbookId();
+  const creator = await getCreatorPayload();
+  const isOwner =
+    adminId === cookbookId ||
+    (creator !== null && creator.cookbookIds.includes(cookbookId));
+  const hasContributeAccess =
+    Boolean(contributeToken) && contributeToken === cookbook.contributeToken;
+
+  if (!isOwner && !hasContributeAccess) {
     return NextResponse.json(
       { error: "A valid contribute link is required to add recipes." },
       { status: 403 }

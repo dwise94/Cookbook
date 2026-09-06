@@ -27,6 +27,8 @@ export function CookbookBrowser({
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [submitToken, setSubmitToken] = useState(contributeToken ?? "");
+  const [allowSubmit, setAllowSubmit] = useState(canSubmit);
 
   const loadCookbook = useCallback(async () => {
     const res = await fetch(`/api/cookbooks/${cookbookId}`);
@@ -36,6 +38,12 @@ export function CookbookBrowser({
     }
     const data = await res.json();
     setCookbook(data);
+    if (data.contributeToken) {
+      setSubmitToken(data.contributeToken);
+      setAllowSubmit(true);
+    } else if (data.canSubmit) {
+      setAllowSubmit(true);
+    }
   }, [cookbookId]);
 
   const loadRecipes = useCallback(async () => {
@@ -105,7 +113,7 @@ export function CookbookBrowser({
               <p className="muted text-sm sm:text-base">
                 {cookbook.creatorName && `Created by ${cookbook.creatorName} · `}
                 {cookbook.recipeCount} recipe{cookbook.recipeCount !== 1 ? "s" : ""}
-                {!canSubmit && " · View only"}
+                {allowSubmit ? " · You can add recipes" : " · View only"}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -117,7 +125,7 @@ export function CookbookBrowser({
                 className="field flex-1"
                 enterKeyHint="search"
               />
-              {canSubmit && (
+              {allowSubmit && (
                 <button
                   type="button"
                   onClick={() => setShowAddForm(true)}
@@ -131,10 +139,10 @@ export function CookbookBrowser({
         </PaperSheet>
       </div>
 
-      {canSubmit && showAddForm && contributeToken && (
+      {allowSubmit && showAddForm && submitToken && (
         <AddRecipeForm
           cookbookId={cookbookId}
-          contributeToken={contributeToken}
+          contributeToken={submitToken}
           onClose={() => setShowAddForm(false)}
           onSuccess={() => {
             setShowAddForm(false);
@@ -147,7 +155,7 @@ export function CookbookBrowser({
       {recipes.length === 0 && !loading ? (
         <PaperSheet lined={false}>
           <p className="muted text-center py-4">
-            {canSubmit ? "No recipes yet. Add the first one!" : "No recipes yet."}
+            {allowSubmit ? "No recipes yet. Add the first one!" : "No recipes yet."}
           </p>
         </PaperSheet>
       ) : (
