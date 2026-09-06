@@ -169,7 +169,7 @@ export default function EditRecipePage() {
     return (
       <PaperSheet lined={false} className="max-w-lg mx-auto text-center space-y-3">
         <p className="muted">This edit link is invalid. Ask the cookbook admin to send you a new one.</p>
-        <Link href="/" className="text-binding hover:underline inline-block">
+        <Link href="/" className="text-sage hover:underline inline-block">
           Go home
         </Link>
       </PaperSheet>

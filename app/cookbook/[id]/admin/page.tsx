@@ -309,7 +309,7 @@ export default function AdminPage() {
           </button>
         </form>
         <p className="text-center text-sm">
-          <Link href={`/cookbook/${id}`} className="text-binding hover:underline">
+          <Link href={`/cookbook/${id}`} className="text-sage hover:underline">
             Back to cookbook
           </Link>
         </p>
@@ -335,7 +335,7 @@ export default function AdminPage() {
       </PaperSheet>
 
       <section className="space-y-3">
-        <h2 className="font-display text-paper text-xl px-1">Share</h2>
+        <h2 className="font-display text-ink text-xl px-1">Share</h2>
         <ShareLinkCard
           title="Contribute link"
           description="Share this so people can add recipes."
@@ -405,7 +405,7 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => unblock(b.submitterName)}
-                  className="text-binding hover:underline min-h-10 px-2"
+                  className="text-sage hover:underline min-h-10 px-2"
                 >
                   Unblock
                 </button>
@@ -416,7 +416,7 @@ export default function AdminPage() {
       </PaperSheet>
 
       <section className="space-y-3">
-        <h2 className="font-display text-paper text-xl px-1">Recipes</h2>
+        <h2 className="font-display text-ink text-xl px-1">Recipes</h2>
         {recipes.length === 0 ? (
           <PaperSheet lined={false}>
             <p className="muted text-sm">No recipes yet.</p>

@@ -21,17 +21,15 @@ export default function ContributePage() {
 
   if (valid === null) {
     return (
-      <div className="text-center py-12 text-stone-500 dark:text-stone-400">Loading…</div>
+      <div className="text-center py-12 muted">Loading…</div>
     );
   }
 
   if (!valid) {
     return (
       <div className="text-center py-12 space-y-3">
-        <p className="text-stone-600 dark:text-stone-400">
-          This contribute link is invalid or expired.
-        </p>
-        <Link href={`/cookbook/${id}`} className="text-amber-600 dark:text-amber-400 hover:underline">
+        <p className="muted">This contribute link is invalid or expired.</p>
+        <Link href={`/cookbook/${id}`} className="text-sage hover:underline">
           View cookbook (read-only)
         </Link>
       </div>

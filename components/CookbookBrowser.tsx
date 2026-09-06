@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { parseInstructions, serializeInstructions } from "@/lib/instructions";
 import { PaperSheet } from "@/components/PaperSheet";
-import { LegalPad } from "@/components/LegalPad";
+import { RecipePanel } from "@/components/RecipePanel";
 
 type Cookbook = { id: string; name: string; creatorName?: string; recipeCount: number };
 type RecipeListItem = { id: string; name: string; submitterName: string; createdAt: string };
@@ -88,12 +88,24 @@ export function CookbookBrowser({
     }
   }, [selectedId]);
 
+  const goRelative = useCallback(
+    (delta: number) => {
+      if (!selectedId || recipes.length === 0) return;
+      const idx = recipes.findIndex((r) => r.id === selectedId);
+      if (idx < 0) return;
+      const next = idx + delta;
+      if (next < 0 || next >= recipes.length) return;
+      setSelectedId(recipes[next].id);
+    },
+    [recipes, selectedId]
+  );
+
   if (notFound || !cookbook) {
     return (
-      <PaperSheet lined={false} className="text-center">
+      <PaperSheet className="text-center">
         <p className="muted">{notFound ? "Cookbook not found." : "Loading…"}</p>
         {notFound && (
-          <Link href="/" className="text-binding hover:underline mt-3 inline-block">
+          <Link href="/" className="text-sage hover:underline mt-3 inline-block">
             Go home
           </Link>
         )}
@@ -102,14 +114,15 @@ export function CookbookBrowser({
   }
 
   const showRecipePane = Boolean(selectedId);
+  const selectedIndex = selectedId ? recipes.findIndex((r) => r.id === selectedId) : -1;
 
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className={showRecipePane ? "hidden md:block" : "block"}>
-        <PaperSheet lined={false} className="space-y-4">
+        <PaperSheet className="space-y-4">
           <div className="flex flex-col gap-3">
             <div>
-              <h1 className="paper-title text-2xl sm:text-3xl text-ink">{cookbook.name}</h1>
+              <h1 className="display-title text-2xl sm:text-3xl text-ink">{cookbook.name}</h1>
               <p className="muted text-sm sm:text-base">
                 {cookbook.creatorName && `Created by ${cookbook.creatorName} · `}
                 {cookbook.recipeCount} recipe{cookbook.recipeCount !== 1 ? "s" : ""}
@@ -153,7 +166,7 @@ export function CookbookBrowser({
       )}
 
       {recipes.length === 0 && !loading ? (
-        <PaperSheet lined={false}>
+        <PaperSheet>
           <p className="muted text-center py-4">
             {allowSubmit ? "No recipes yet. Add the first one!" : "No recipes yet."}
           </p>
@@ -181,15 +194,19 @@ export function CookbookBrowser({
                 detail={detail}
                 onBack={() => setSelectedId(null)}
                 showBack
+                onSwipeNext={() => goRelative(1)}
+                onSwipePrev={() => goRelative(-1)}
+                hasNext={selectedIndex >= 0 && selectedIndex < recipes.length - 1}
+                hasPrev={selectedIndex > 0}
               />
             ) : selectedId ? (
-              <LegalPad>
-                <p className="legal-pad-byline">Loading recipe…</p>
-              </LegalPad>
+              <RecipePanel>
+                <p className="muted">Loading recipe…</p>
+              </RecipePanel>
             ) : (
-              <LegalPad className="hidden md:block">
-                <p className="legal-pad-byline">Select a recipe to open the page.</p>
-              </LegalPad>
+              <RecipePanel className="hidden md:block min-h-[12rem]">
+                <p className="muted">Select a recipe to open it.</p>
+              </RecipePanel>
             )}
           </div>
         </div>
@@ -202,45 +219,72 @@ function RecipePage({
   detail,
   onBack,
   showBack,
+  onSwipeNext,
+  onSwipePrev,
+  hasNext,
+  hasPrev,
 }: {
   detail: RecipeDetail;
   onBack: () => void;
   showBack: boolean;
+  onSwipeNext: () => void;
+  onSwipePrev: () => void;
+  hasNext: boolean;
+  hasPrev: boolean;
 }) {
   const steps = parseInstructions(detail.instructions);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.changedTouches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (!touchStart.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStart.current.x;
+    const dy = t.clientY - touchStart.current.y;
+    touchStart.current = null;
+    if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    // Conventional: swipe left → next, swipe right → previous
+    if (dx < 0 && hasNext) onSwipeNext();
+    if (dx > 0 && hasPrev) onSwipePrev();
+  }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       {showBack && (
         <button
           type="button"
           onClick={onBack}
-          className="md:hidden btn-secondary w-full sticky top-[3.25rem] z-30 shadow-md"
+          className="md:hidden btn-secondary w-full sticky top-[3.25rem] z-30 shadow-sm"
         >
           ← All recipes
         </button>
       )}
-      <LegalPad className="min-h-[70vh] sm:min-h-[28rem]">
-        <h2 className="legal-pad-title">{detail.name}</h2>
-        <p className="legal-pad-byline">by {detail.submitterName}</p>
+      <RecipePanel className="min-h-[70vh] sm:min-h-[28rem]">
+        <h2 className="recipe-panel-title">{detail.name}</h2>
+        <p className="recipe-panel-byline">by {detail.submitterName}</p>
+        <p className="recipe-swipe-hint">Swipe left or right for more recipes</p>
 
-        <h3 className="legal-pad-section">Ingredients</h3>
-        <pre>{detail.ingredients || "—"}</pre>
+        <h3 className="recipe-panel-section">Ingredients</h3>
+        <pre className="recipe-panel-body">{detail.ingredients || "—"}</pre>
 
-        <h3 className="legal-pad-section">Instructions</h3>
+        <h3 className="recipe-panel-section">Instructions</h3>
         {steps.length === 0 ? (
-          <p className="legal-pad-byline">—</p>
+          <p className="muted">—</p>
         ) : (
-          <ol className="list-none">
+          <ol className="recipe-panel-steps">
             {steps.map((step, i) => (
-              <li key={i} className="legal-pad-step">
-                <span className="legal-pad-step-num">{i + 1}.</span>
-                <span className="legal-pad-step-text">{step}</span>
+              <li key={i} className="recipe-panel-step">
+                <span className="recipe-panel-step-num">{i + 1}</span>
+                <span className="recipe-panel-step-text">{step}</span>
               </li>
             ))}
           </ol>
         )}
-      </LegalPad>
+      </RecipePanel>
     </div>
   );
 }
@@ -304,8 +348,8 @@ function AddRecipeForm({
 
   if (editLink) {
     return (
-      <PaperSheet lined={false} className="space-y-3">
-        <p className="paper-title text-xl text-ink">Recipe added.</p>
+      <PaperSheet className="space-y-3">
+        <p className="display-title text-xl text-ink">Recipe added.</p>
         <p className="text-sm muted">
           Save this link if you want to edit later. The cookbook admin can also send you an edit
           link anytime.
@@ -328,12 +372,12 @@ function AddRecipeForm({
   }
 
   return (
-    <PaperSheet lined={false}>
-      <h2 className="paper-title text-xl text-ink mb-4">Add a recipe</h2>
+    <PaperSheet>
+      <h2 className="display-title text-xl text-ink mb-4">Add a recipe</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="label">
-            Your name <span className="text-binding">*</span>
+            Your name <span className="text-coral">*</span>
           </label>
           <input
             type="text"
@@ -347,7 +391,7 @@ function AddRecipeForm({
         </div>
         <div>
           <label className="label">
-            Recipe name <span className="text-binding">*</span>
+            Recipe name <span className="text-coral">*</span>
           </label>
           <input
             type="text"

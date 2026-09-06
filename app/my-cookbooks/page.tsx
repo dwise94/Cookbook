@@ -62,7 +62,7 @@ export default function MyCookbooksPage() {
           </Link>
         </div>
         <p className="text-sm">
-          <Link href="/" className="text-binding hover:underline">
+          <Link href="/" className="text-sage hover:underline">
             Back to home
           </Link>
         </p>
@@ -106,7 +106,7 @@ export default function MyCookbooksPage() {
       </ul>
 
       <p className="text-center sm:text-left">
-        <Link href="/create" className="text-paper hover:underline text-sm font-medium">
+        <Link href="/create" className="text-sage hover:underline text-sm font-medium">
           Create another cookbook
         </Link>
       </p>

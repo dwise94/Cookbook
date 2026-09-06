@@ -10,31 +10,41 @@ export default {
     extend: {
       colors: {
         ink: {
-          DEFAULT: "#1c2b28",
-          muted: "#5a6b66",
+          DEFAULT: "#2a322c",
+          muted: "#6b756f",
+        },
+        canvas: "#f0eee9",
+        surface: "#ffffff",
+        sage: {
+          DEFAULT: "#4a6b52",
+          hover: "#3d5a44",
+        },
+        coral: {
+          DEFAULT: "#e06b5c",
+          hover: "#c95a4d",
+        },
+        /* legacy aliases used in a few places */
+        binding: {
+          DEFAULT: "#4a6b52",
+          hover: "#3d5a44",
         },
         desk: {
-          DEFAULT: "#2f453c",
-          deep: "#24362f",
-        },
-        binding: {
-          DEFAULT: "#0f6e6a",
-          hover: "#0b5855",
+          DEFAULT: "#f0eee9",
+          deep: "#ffffff",
         },
         paper: {
-          DEFAULT: "#fffcf5",
-          line: "#b8c9dc",
-          margin: "#d97878",
+          DEFAULT: "#ffffff",
+          line: "#d8d4cc",
+          margin: "#e06b5c",
         },
       },
       fontFamily: {
         display: ["var(--font-display)", "ui-serif", "Georgia", "serif"],
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        hand: ["var(--font-hand)", "cursive"],
       },
       fontSize: {
-        cooking: ["1.125rem", { lineHeight: "32px" }],
-        "cooking-lg": ["1.25rem", { lineHeight: "32px" }],
+        cooking: ["1.05rem", { lineHeight: "1.65" }],
+        "cooking-lg": ["1.125rem", { lineHeight: "1.55" }],
       },
     },
   },

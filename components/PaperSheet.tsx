@@ -1,17 +1,14 @@
 import { ReactNode } from "react";
 
+/** Light surface panel for forms and page sections. */
 export function PaperSheet({
   children,
   className = "",
-  lined = true,
 }: {
   children: ReactNode;
   className?: string;
+  /** @deprecated Lined notebook style removed */
   lined?: boolean;
 }) {
-  return (
-    <div className={`${lined ? "paper-sheet" : "paper-sheet-plain"} ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`panel ${className}`}>{children}</div>;
 }

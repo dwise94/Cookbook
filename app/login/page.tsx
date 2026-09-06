@@ -91,7 +91,7 @@ export default function LoginPage() {
         </button>
       </form>
       <p className="text-center text-sm">
-        <Link href="/" className="text-binding hover:underline">
+        <Link href="/" className="text-sage hover:underline">
           Back to home
         </Link>
       </p>
