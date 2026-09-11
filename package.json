@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/prepare-sqlite-schema.cjs && prisma generate --schema=prisma/schema.sqlite.prisma && prisma db push --schema=prisma/schema.sqlite.prisma && next dev",
-    "build": "node scripts/ensure-database-url.cjs && prisma generate && prisma db push --accept-data-loss && next build",
+    "build": "node scripts/ensure-database-url.cjs && prisma generate && node scripts/db-push-prod.cjs && next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
