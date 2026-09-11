@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { parseInstructions, serializeInstructions } from "@/lib/instructions";
+import { prepareCookPhotos } from "@/lib/prepare-cook-photo";
 import { PaperSheet } from "@/components/PaperSheet";
 import { RecipePanel } from "@/components/RecipePanel";
 
@@ -539,7 +540,8 @@ function RecipePage({
     try {
       const formData = new FormData();
       formData.append("rating", String(rating));
-      for (const file of cookPhotos) {
+      const prepared = await prepareCookPhotos(cookPhotos);
+      for (const file of prepared) {
         formData.append("photos", file);
       }
       const res = await fetch(`/api/cookbooks/${cookbookId}/recipes/${detail.id}/cooks`, {
@@ -548,7 +550,8 @@ function RecipePage({
       });
       const data = await res.json();
       if (!res.ok) {
-        setCookError(data.error ?? "Could not log this cook.");
+        const detailMsg = data.details ? ` ${data.details}` : "";
+        setCookError((data.error ?? "Could not log this cook.") + detailMsg);
         return;
       }
       onCooksChanged([data, ...cooks]);
@@ -576,7 +579,8 @@ function RecipePage({
     setCookError("");
     try {
       const formData = new FormData();
-      for (const file of Array.from(files).slice(0, 6)) {
+      const prepared = await prepareCookPhotos(Array.from(files).slice(0, 6));
+      for (const file of prepared) {
         formData.append("photos", file);
       }
       const res = await fetch(
@@ -585,7 +589,8 @@ function RecipePage({
       );
       const data = await res.json();
       if (!res.ok) {
-        setCookError(data.error ?? "Could not add photos.");
+        const detailMsg = data.details ? ` ${data.details}` : "";
+        setCookError((data.error ?? "Could not add photos.") + detailMsg);
         return;
       }
       onCooksChanged(
@@ -796,7 +801,7 @@ function RecipePage({
                       }}
                     />
                   </label>
-                  <span className="text-xs muted">Up to 6 · 4MB each</span>
+                  <span className="text-xs muted">Up to 6 · compressed automatically</span>
                 </div>
                 {cookPhotoPreviews.length > 0 && (
                   <ul className="cook-photo-thumbs">

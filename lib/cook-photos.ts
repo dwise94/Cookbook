@@ -1,7 +1,7 @@
 import { put, del, get } from "@vercel/blob";
 import { nanoid } from "nanoid";
 
-export const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+export const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
 export const MAX_PHOTOS_PER_COOK = 6;
 
 const ALLOWED_TYPES = new Set([
@@ -64,13 +64,19 @@ export async function uploadCookPhotos(
     throw new Error("Photo uploads are not configured (missing BLOB_READ_WRITE_TOKEN).");
   }
 
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
   const uploaded: UploadedPhoto[] = [];
   for (const file of files) {
     const pathname = `cooks/${cookbookId}/${recipeId}/${nanoid(12)}.${extensionFor(file)}`;
-    const result = await put(pathname, file, {
+    // Buffer is more reliable than File in Vercel Node serverless / multipart form parsing.
+    const bytes = Buffer.from(await file.arrayBuffer());
+    if (bytes.length === 0) {
+      throw new Error("One of the selected photos was empty.");
+    }
+    const result = await put(pathname, bytes, {
       access: "private",
-      contentType: file.type || undefined,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      contentType: file.type || "application/octet-stream",
+      token,
     });
     uploaded.push({ url: result.url, pathname: result.pathname });
   }

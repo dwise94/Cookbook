@@ -10,6 +10,9 @@ import {
   validatePhotoFiles,
 } from "@/lib/cook-photos";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const photoSelect = {
   id: true,
   url: true,
@@ -88,8 +91,11 @@ export async function POST(
     uploaded = await uploadCookPhotos(cookbookId, recipeId, photoFiles);
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
-    console.error("Add cook photo error:", err.message);
-    return NextResponse.json({ error: "Could not upload photos." }, { status: 500 });
+    console.error("Add cook photo error:", err.message, err);
+    return NextResponse.json(
+      { error: "Could not upload photos.", details: err.message },
+      { status: 500 }
+    );
   }
 
   await prisma.recipeCookPhoto.createMany({

@@ -10,6 +10,9 @@ import {
   validatePhotoFiles,
 } from "@/lib/cook-photos";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const photoSelect = {
   id: true,
   url: true,
@@ -86,8 +89,14 @@ export async function POST(
     }
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
-    console.error("Cook photo upload error:", err.message);
-    return NextResponse.json({ error: "Could not upload photos." }, { status: 500 });
+    console.error("Cook photo upload error:", err.message, err);
+    return NextResponse.json(
+      {
+        error: "Could not upload photos.",
+        details: err.message,
+      },
+      { status: 500 }
+    );
   }
 
   if (uploaded.length > MAX_PHOTOS_PER_COOK) {
