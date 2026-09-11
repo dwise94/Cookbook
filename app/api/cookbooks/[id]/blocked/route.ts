@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAdminCookbookId } from "@/lib/auth";
+import { requireCookbookOwner } from "@/lib/auth";
 
 const NAME_MAX = 80;
 
@@ -13,10 +13,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: cookbookId } = await params;
-  const adminId = await getAdminCookbookId();
-  if (adminId !== cookbookId) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
-  }
+  const auth = await requireCookbookOwner(cookbookId);
+  if ("error" in auth) return auth.error;
 
   const list = await prisma.blockedSubmitter.findMany({
     where: { cookbookId },
@@ -31,10 +29,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: cookbookId } = await params;
-  const adminId = await getAdminCookbookId();
-  if (adminId !== cookbookId) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
-  }
+  const auth = await requireCookbookOwner(cookbookId);
+  if ("error" in auth) return auth.error;
 
   let body: unknown;
   try {
@@ -44,11 +40,11 @@ export async function POST(
   }
   const submitterName = sanitize(
     typeof (body as Record<string, unknown>).submitterName === "string"
-      ? (body as Record<string, unknown>).submitterName as string
+      ? ((body as Record<string, unknown>).submitterName as string)
       : ""
   );
   if (!submitterName) {
-    return NextResponse.json({ error: "Submitter name is required." }, { status: 400 });
+    return NextResponse.json({ error: "Username to block is required." }, { status: 400 });
   }
 
   await prisma.blockedSubmitter.upsert({
@@ -66,10 +62,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: cookbookId } = await params;
-  const adminId = await getAdminCookbookId();
-  if (adminId !== cookbookId) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
-  }
+  const auth = await requireCookbookOwner(cookbookId);
+  if ("error" in auth) return auth.error;
 
   const url = new URL(request.url);
   const id = url.searchParams.get("id");

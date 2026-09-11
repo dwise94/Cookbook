@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
 import type { Prisma } from "@prisma/client";
-import { getAdminCookbookId, getCreatorPayload } from "@/lib/auth";
+import { requireCookbookMember } from "@/lib/auth";
 
-const SUBMITTER_NAME_MAX = 80;
 const RECIPE_NAME_MAX = 200;
 const INGREDIENTS_MAX = 8000;
 const INSTRUCTIONS_MAX = 15000;
@@ -18,6 +17,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: cookbookId } = await params;
+  const auth = await requireCookbookMember(cookbookId);
+  if ("error" in auth) return auth.error;
+
   const cookbook = await prisma.cookbook.findUnique({
     where: { id: cookbookId },
     select: { id: true },
@@ -58,9 +60,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: cookbookId } = await params;
+  const auth = await requireCookbookMember(cookbookId);
+  if ("error" in auth) return auth.error;
+
   const cookbook = await prisma.cookbook.findUnique({
     where: { id: cookbookId },
-    select: { id: true, contributeToken: true },
+    select: { id: true },
   });
   if (!cookbook) {
     return NextResponse.json({ error: "Cookbook not found." }, { status: 404 });
@@ -73,30 +78,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const contributeToken =
-    typeof (body as Record<string, unknown>).contributeToken === "string"
-      ? ((body as Record<string, unknown>).contributeToken as string)
-      : request.headers.get("x-contribute-token") ?? "";
-
-  const adminId = await getAdminCookbookId();
-  const creator = await getCreatorPayload();
-  const isOwner =
-    adminId === cookbookId ||
-    (creator !== null && creator.cookbookIds.includes(cookbookId));
-  const hasContributeAccess =
-    Boolean(contributeToken) && contributeToken === cookbook.contributeToken;
-
-  if (!isOwner && !hasContributeAccess) {
-    return NextResponse.json(
-      { error: "A valid contribute link is required to add recipes." },
-      { status: 403 }
-    );
-  }
-
-  const submitterName =
-    typeof (body as Record<string, unknown>).submitterName === "string"
-      ? sanitize((body as Record<string, unknown>).submitterName as string, SUBMITTER_NAME_MAX)
-      : "";
+  const submitterName = auth.user.username;
   const name =
     typeof (body as Record<string, unknown>).name === "string"
       ? sanitize((body as Record<string, unknown>).name as string, RECIPE_NAME_MAX)
@@ -110,12 +92,6 @@ export async function POST(
       ? sanitize((body as Record<string, unknown>).instructions as string, INSTRUCTIONS_MAX)
       : "";
 
-  if (!submitterName) {
-    return NextResponse.json(
-      { error: "Your name is required to add a recipe." },
-      { status: 400 }
-    );
-  }
   if (!name) {
     return NextResponse.json({ error: "Recipe name is required." }, { status: 400 });
   }
@@ -146,7 +122,6 @@ export async function POST(
 
   return NextResponse.json({
     id: recipe.id,
-    editToken,
-    message: "Recipe added. Save the edit link below, or ask the admin to send one later.",
+    message: "Recipe added.",
   });
 }

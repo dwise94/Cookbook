@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAdminCookbookId, getCreatorPayload } from "@/lib/auth";
+import { requireCookbookMember, requireCookbookOwner } from "@/lib/auth";
 
 const NAME_MAX = 100;
 
@@ -9,13 +9,16 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const auth = await requireCookbookMember(id);
+  if ("error" in auth) return auth.error;
+
   const cookbook = await prisma.cookbook.findUnique({
     where: { id },
     select: {
       id: true,
       name: true,
-      creatorName: true,
-      contributeToken: true,
+      inviteToken: true,
+      owner: { select: { username: true } },
       _count: { select: { recipes: true } },
     },
   });
@@ -23,17 +26,17 @@ export async function GET(
     return NextResponse.json({ error: "Cookbook not found." }, { status: 404 });
   }
 
-  const adminId = await getAdminCookbookId();
-  const creator = await getCreatorPayload();
-  const isOwner =
-    adminId === id || (creator !== null && creator.cookbookIds.includes(id));
+  const isOwner = auth.role === "owner";
 
   return NextResponse.json({
     id: cookbook.id,
     name: cookbook.name,
-    creatorName: cookbook.creatorName,
+    creatorName: cookbook.owner.username,
     recipeCount: cookbook._count.recipes,
-    ...(isOwner ? { contributeToken: cookbook.contributeToken, canSubmit: true } : {}),
+    canSubmit: true,
+    role: auth.role,
+    username: auth.user.username,
+    ...(isOwner ? { inviteToken: cookbook.inviteToken } : {}),
   });
 }
 
@@ -42,13 +45,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const adminCookbookId = await getAdminCookbookId();
-  if (adminCookbookId !== id) {
-    return NextResponse.json(
-      { error: "You must be the cookbook admin to change the name." },
-      { status: 403 }
-    );
-  }
+  const auth = await requireCookbookOwner(id);
+  if ("error" in auth) return auth.error;
 
   const cookbook = await prisma.cookbook.findUnique({
     where: { id },

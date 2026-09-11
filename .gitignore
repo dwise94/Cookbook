@@ -28,6 +28,7 @@ yarn-error.log*
 # prisma
 prisma/dev.db
 prisma/dev.db-journal
+prisma/schema.sqlite.prisma
 
 # ide
 .idea

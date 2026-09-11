@@ -20,13 +20,10 @@ type Blocked = { id: string; submitterName: string }[];
 export default function AdminPage() {
   const params = useParams();
   const id = params.id as string;
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
+  const [access, setAccess] = useState<"loading" | "denied" | "owner">("loading");
   const [cookbookName, setCookbookName] = useState("");
   const [creatorName, setCreatorName] = useState("");
-  const [contributeToken, setContributeToken] = useState("");
+  const [inviteToken, setInviteToken] = useState("");
   const [editName, setEditName] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
   const [nameError, setNameError] = useState("");
@@ -34,7 +31,6 @@ export default function AdminPage() {
   const [blocked, setBlocked] = useState<Blocked>([]);
   const [blockName, setBlockName] = useState("");
   const [blockError, setBlockError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [origin, setOrigin] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
@@ -51,14 +47,25 @@ export default function AdminPage() {
     setOrigin(window.location.origin);
   }, []);
 
-  const checkAuth = useCallback(async () => {
+  const load = useCallback(async () => {
     const res = await fetch(`/api/cookbooks/${id}`);
-    if (!res.ok) return false;
+    if (res.status === 401 || res.status === 403) {
+      setAccess("denied");
+      return;
+    }
+    if (!res.ok) {
+      setAccess("denied");
+      return;
+    }
     const cookbook = await res.json();
+    if (cookbook.role !== "owner" || !cookbook.inviteToken) {
+      setAccess("denied");
+      return;
+    }
     setCookbookName(cookbook.name ?? "");
     setCreatorName(cookbook.creatorName ?? "");
     setEditName(cookbook.name ?? "");
-    if (cookbook.contributeToken) setContributeToken(cookbook.contributeToken);
+    setInviteToken(cookbook.inviteToken);
 
     const recipesRes = await fetch(`/api/cookbooks/${id}/recipes`);
     if (recipesRes.ok) {
@@ -66,45 +73,16 @@ export default function AdminPage() {
       setRecipes(data.recipes ?? []);
     }
     const blockedRes = await fetch(`/api/cookbooks/${id}/blocked`);
-    if (blockedRes.status === 403) return false;
     if (blockedRes.ok) {
       const data = await blockedRes.json();
       setBlocked(data.blocked ?? []);
     }
-    return blockedRes.status === 200;
+    setAccess("owner");
   }, [id]);
 
   useEffect(() => {
-    checkAuth().then((isAdmin) => {
-      setLoggedIn(isAdmin);
-      setLoading(false);
-    });
-  }, [checkAuth]);
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoginError("");
-    setLoginLoading(true);
-    try {
-      const res = await fetch(`/api/cookbooks/${id}/admin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setLoginError(data.error ?? "Login failed.");
-        return;
-      }
-      setPassword("");
-      const isAdmin = await checkAuth();
-      setLoggedIn(isAdmin);
-    } catch {
-      setLoginError("Network error.");
-    } finally {
-      setLoginLoading(false);
-    }
-  }
+    load();
+  }, [load]);
 
   async function deleteRecipe(recipeId: string) {
     if (!confirm("Delete this recipe? This cannot be undone.")) return;
@@ -118,7 +96,7 @@ export default function AdminPage() {
   async function blockUser() {
     const name = blockName.trim();
     if (!name) {
-      setBlockError("Enter a name to block.");
+      setBlockError("Enter a username to block.");
       return;
     }
     setBlockError("");
@@ -147,11 +125,6 @@ export default function AdminPage() {
     );
     if (!res.ok) return;
     setBlocked((prev) => prev.filter((b) => b.submitterName !== submitterName));
-  }
-
-  async function logout() {
-    await fetch(`/api/cookbooks/${id}/admin`, { method: "DELETE" });
-    setLoggedIn(false);
   }
 
   async function saveCookbookName() {
@@ -267,11 +240,10 @@ export default function AdminPage() {
     return `${origin}/recipe/${recipeId}/edit?token=${encodeURIComponent(token)}`;
   }
 
-  const readOnlyUrl = origin ? `${origin}/cookbook/${id}` : "";
-  const contributeUrl =
-    origin && contributeToken ? `${origin}/cookbook/${id}/contribute/${contributeToken}` : "";
+  const inviteUrl =
+    origin && inviteToken ? `${origin}/cookbook/${id}/invite/${inviteToken}` : "";
 
-  if (loading) {
+  if (access === "loading") {
     return (
       <PaperSheet lined={false} className="text-center">
         <p className="muted">Loading…</p>
@@ -279,40 +251,21 @@ export default function AdminPage() {
     );
   }
 
-  if (loggedIn === false) {
+  if (access === "denied") {
     return (
-      <PaperSheet lined={false} className="max-w-md mx-auto space-y-4">
-        <h1 className="paper-title text-2xl text-ink">Admin login</h1>
-        <p className="muted text-sm">Enter the password you set when creating this cookbook.</p>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label htmlFor="admin-password" className="label">
-              Password
-            </label>
-            <input
-              id="admin-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="field"
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          {loginError && (
-            <p className="text-red-700 text-sm" role="alert">
-              {loginError}
-            </p>
-          )}
-          <button type="submit" disabled={loginLoading} className="btn-primary w-full">
-            {loginLoading ? "Checking…" : "Log in"}
-          </button>
-        </form>
-        <p className="text-center text-sm">
-          <Link href={`/cookbook/${id}`} className="text-sage hover:underline">
+      <PaperSheet lined={false} className="max-w-md mx-auto space-y-4 text-center">
+        <h1 className="paper-title text-2xl text-ink">Manage cookbook</h1>
+        <p className="muted text-sm">
+          Only the cookbook owner can manage this page. Log in with the owner account.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link href={`/login?next=${encodeURIComponent(`/cookbook/${id}/admin`)}`} className="btn-primary">
+            Log in
+          </Link>
+          <Link href={`/cookbook/${id}`} className="btn-secondary">
             Back to cookbook
           </Link>
-        </p>
+        </div>
       </PaperSheet>
     );
   }
@@ -321,30 +274,20 @@ export default function AdminPage() {
     <div className="space-y-4 sm:space-y-6">
       <PaperSheet lined={false} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="paper-title text-2xl sm:text-3xl text-ink">Admin – {cookbookName}</h1>
-          {creatorName && <p className="muted text-sm">Created by {creatorName}</p>}
+          <h1 className="paper-title text-2xl sm:text-3xl text-ink">Manage – {cookbookName}</h1>
+          {creatorName && <p className="muted text-sm">Owned by {creatorName}</p>}
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <Link href={`/cookbook/${id}`} className="btn-secondary text-center text-sm">
-            View cookbook
-          </Link>
-          <button type="button" onClick={logout} className="btn-secondary text-sm">
-            Log out
-          </button>
-        </div>
+        <Link href={`/cookbook/${id}`} className="btn-secondary text-center text-sm">
+          View cookbook
+        </Link>
       </PaperSheet>
 
       <section className="space-y-3">
-        <h2 className="font-display text-ink text-xl px-1">Share</h2>
+        <h2 className="font-display text-ink text-xl px-1">Invite friends</h2>
         <ShareLinkCard
-          title="Contribute link"
-          description="Share this so people can add recipes."
-          url={contributeUrl}
-        />
-        <ShareLinkCard
-          title="Read-only link"
-          description="Share this for viewing only."
-          url={readOnlyUrl}
+          title="Invite link"
+          description="Share this so friends can join your cookbook (account required)."
+          url={inviteUrl}
         />
       </section>
 
@@ -376,13 +319,13 @@ export default function AdminPage() {
 
       <PaperSheet lined={false} className="space-y-3">
         <h2 className="paper-title text-lg text-ink">Block a user</h2>
-        <p className="text-sm muted">Enter the exact name they use when adding recipes.</p>
+        <p className="text-sm muted">Enter their username exactly.</p>
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             type="text"
             value={blockName}
             onChange={(e) => setBlockName(e.target.value)}
-            placeholder="Submitter name"
+            placeholder="Username"
             className="field flex-1"
           />
           <button type="button" onClick={blockUser} className="btn-secondary shrink-0">
@@ -464,7 +407,7 @@ export default function AdminPage() {
                   {sharingEditId === r.id && (
                     <ShareLinkCard
                       title={`Edit link – ${r.name}`}
-                      description="Give this link or QR to the submitter so they can update their recipe."
+                      description="Optional backup link if someone needs to edit without being logged in as the submitter."
                       url={editLinkUrl(r.id)}
                     />
                   )}

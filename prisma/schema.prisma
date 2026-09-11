@@ -7,28 +7,94 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String           @id @default(cuid())
+  username     String           @unique
+  passwordHash String
+  createdAt    DateTime         @default(now())
+  ownedCookbooks Cookbook[]     @relation("CookbookOwner")
+  memberships  CookbookMember[]
+  cooks        RecipeCook[]
+  notes        RecipeNote[]
+}
+
 model Cookbook {
-  id              String   @id @default(cuid())
-  name            String
-  creatorName     String   @default("")
-  passwordHash    String
-  contributeToken String   @unique
-  createdAt       DateTime @default(now())
-  recipes         Recipe[]
-  blocked         BlockedSubmitter[]
+  id          String             @id @default(cuid())
+  name        String
+  ownerId     String
+  owner       User               @relation("CookbookOwner", fields: [ownerId], references: [id])
+  inviteToken String             @unique
+  createdAt   DateTime           @default(now())
+  recipes     Recipe[]
+  blocked     BlockedSubmitter[]
+  members     CookbookMember[]
+}
+
+model CookbookMember {
+  id         String   @id @default(cuid())
+  cookbookId String
+  userId     String
+  role       String
+  createdAt  DateTime @default(now())
+  cookbook   Cookbook @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cookbookId, userId])
+  @@index([userId])
 }
 
 model Recipe {
-  id            String   @id @default(cuid())
+  id            String       @id @default(cuid())
   cookbookId    String
-  cookbook      Cookbook @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
+  cookbook      Cookbook     @relation(fields: [cookbookId], references: [id], onDelete: Cascade)
   name          String
   submitterName String
   ingredients   String
   instructions  String
-  editToken     String   @unique
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  editToken     String       @unique
+  lastEditedBy  String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  notes         RecipeNote[]
+  cooks         RecipeCook[]
+}
+
+model RecipeNote {
+  id         String   @id @default(cuid())
+  recipeId   String
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authorName String
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([recipeId, createdAt])
+}
+
+model RecipeCook {
+  id        String            @id @default(cuid())
+  recipeId  String
+  recipe    Recipe            @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cookName  String
+  rating    Int
+  cookedAt  DateTime          @default(now())
+  photos    RecipeCookPhoto[]
+
+  @@index([recipeId, cookedAt])
+}
+
+model RecipeCookPhoto {
+  id        String     @id @default(cuid())
+  cookId    String
+  cook      RecipeCook @relation(fields: [cookId], references: [id], onDelete: Cascade)
+  url       String
+  pathname  String
+  createdAt DateTime   @default(now())
+
+  @@index([cookId, createdAt])
 }
 
 model BlockedSubmitter {

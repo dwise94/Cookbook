@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PaperSheet } from "@/components/PaperSheet";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/my-cookbooks";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,7 +27,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/creator-login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim(), password }),
@@ -35,7 +37,7 @@ export default function LoginPage() {
         setError(data.error ?? "Login failed.");
         return;
       }
-      router.push("/my-cookbooks");
+      router.push(next);
       router.refresh();
     } catch {
       setError("Network error. Please try again.");
@@ -46,21 +48,18 @@ export default function LoginPage() {
 
   return (
     <PaperSheet lined={false} className="max-w-md mx-auto space-y-4">
-      <h1 className="paper-title text-2xl sm:text-3xl text-ink">Find your cookbooks</h1>
-      <p className="muted text-sm">
-        Log in with the username and password you used when creating your cookbook(s).
-      </p>
+      <h1 className="paper-title text-2xl sm:text-3xl text-ink">Log in</h1>
+      <p className="muted text-sm">Sign in to open your cookbooks and accept invites.</p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="username" className="label">
-            Your username
+            Username
           </label>
           <input
             id="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Same as when you created the cookbook"
             className="field"
             maxLength={80}
             autoFocus
@@ -76,7 +75,6 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Same as when you created the cookbook"
             className="field"
             autoComplete="current-password"
           />
@@ -90,11 +88,29 @@ export default function LoginPage() {
           {loading ? "Logging in…" : "Log in"}
         </button>
       </form>
-      <p className="text-center text-sm">
-        <Link href="/" className="text-sage hover:underline">
-          Back to home
+      <p className="text-center text-sm muted">
+        No account yet?{" "}
+        <Link
+          href={`/signup${next !== "/my-cookbooks" ? `?next=${encodeURIComponent(next)}` : ""}`}
+          className="text-sage hover:underline"
+        >
+          Sign up
         </Link>
       </p>
     </PaperSheet>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <PaperSheet lined={false} className="text-center">
+          <p className="muted">Loading…</p>
+        </PaperSheet>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -95,6 +95,7 @@ export async function PATCH(
       ...(name !== undefined && { name }),
       ...(ingredients !== undefined && { ingredients }),
       ...(instructions !== undefined && { instructions }),
+      lastEditedBy: recipe.submitterName,
     },
     select: {
       id: true,
@@ -102,6 +103,7 @@ export async function PATCH(
       submitterName: true,
       ingredients: true,
       instructions: true,
+      lastEditedBy: true,
       updatedAt: true,
     },
   });

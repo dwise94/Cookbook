@@ -6,19 +6,101 @@ import { parseInstructions, serializeInstructions } from "@/lib/instructions";
 import { PaperSheet } from "@/components/PaperSheet";
 import { RecipePanel } from "@/components/RecipePanel";
 
-type Cookbook = { id: string; name: string; creatorName?: string; recipeCount: number };
+type Cookbook = {
+  id: string;
+  name: string;
+  creatorName?: string;
+  recipeCount: number;
+  username?: string;
+  role?: string;
+};
+type RecipeNote = {
+  id: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+};
+type RecipeCookPhoto = {
+  id: string;
+  url: string;
+  createdAt: string;
+};
+type RecipeCook = {
+  id: string;
+  userId?: string | null;
+  cookName: string;
+  rating: number;
+  cookedAt: string;
+  photos?: RecipeCookPhoto[];
+};
 type RecipeListItem = { id: string; name: string; submitterName: string; createdAt: string };
-type RecipeDetail = RecipeListItem & { ingredients: string; instructions: string; updatedAt: string };
+type RecipeDetail = RecipeListItem & {
+  ingredients: string;
+  instructions: string;
+  updatedAt: string;
+  lastEditedBy?: string | null;
+  notes?: RecipeNote[];
+  cooks?: RecipeCook[];
+  timesCooked?: number;
+  lastCookedAt?: string | null;
+  cookedBy?: string[];
+  averageRating?: number | null;
+  canEdit?: boolean;
+  username?: string;
+  userId?: string;
+  role?: string;
+};
 
-export function CookbookBrowser({
-  cookbookId,
-  contributeToken,
-  canSubmit,
+function formatRecipeDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function StarRating({
+  value,
+  onChange,
+  readOnly = false,
+  size = "md",
 }: {
-  cookbookId: string;
-  contributeToken?: string;
-  canSubmit: boolean;
+  value: number;
+  onChange?: (n: number) => void;
+  readOnly?: boolean;
+  size?: "sm" | "md";
 }) {
+  const [hover, setHover] = useState(0);
+  const display = hover || value;
+  const cls = size === "sm" ? "star-btn star-btn-sm" : "star-btn";
+
+  return (
+    <div
+      className="star-rating"
+      role={readOnly ? "img" : "radiogroup"}
+      aria-label={readOnly ? `${value} out of 5 stars` : "Rate this cook"}
+      onMouseLeave={() => setHover(0)}
+    >
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          className={`${cls} ${display >= n ? "is-on" : ""}`}
+          disabled={readOnly}
+          aria-label={`${n} star${n === 1 ? "" : "s"}`}
+          onMouseEnter={() => !readOnly && setHover(n)}
+          onClick={() => onChange?.(n)}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function CookbookBrowser({ cookbookId }: { cookbookId: string }) {
   const [cookbook, setCookbook] = useState<Cookbook | null>(null);
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
   const [search, setSearch] = useState("");
@@ -26,24 +108,27 @@ export function CookbookBrowser({
   const [detail, setDetail] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [notFound, setNotFound] = useState(false);
-  const [submitToken, setSubmitToken] = useState(contributeToken ?? "");
-  const [allowSubmit, setAllowSubmit] = useState(canSubmit);
+  const [access, setAccess] = useState<"ok" | "denied" | "unauth" | "missing">("ok");
+  const [username, setUsername] = useState("");
 
   const loadCookbook = useCallback(async () => {
     const res = await fetch(`/api/cookbooks/${cookbookId}`);
+    if (res.status === 401) {
+      setAccess("unauth");
+      return;
+    }
+    if (res.status === 403) {
+      setAccess("denied");
+      return;
+    }
     if (!res.ok) {
-      setNotFound(true);
+      setAccess("missing");
       return;
     }
     const data = await res.json();
     setCookbook(data);
-    if (data.contributeToken) {
-      setSubmitToken(data.contributeToken);
-      setAllowSubmit(true);
-    } else if (data.canSubmit) {
-      setAllowSubmit(true);
-    }
+    setUsername(data.username ?? "");
+    setAccess("ok");
   }, [cookbookId]);
 
   const loadRecipes = useCallback(async () => {
@@ -59,11 +144,11 @@ export function CookbookBrowser({
   }, [loadCookbook]);
 
   useEffect(() => {
-    loadRecipes();
-  }, [loadRecipes]);
+    if (access === "ok") loadRecipes();
+  }, [loadRecipes, access]);
 
   useEffect(() => {
-    if (!selectedId) {
+    if (!selectedId || access !== "ok") {
       setDetail(null);
       return;
     }
@@ -71,16 +156,19 @@ export function CookbookBrowser({
     fetch(`/api/cookbooks/${cookbookId}/recipes/${selectedId}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!cancelled && data) setDetail(data);
+        if (!cancelled && data) {
+          setDetail(data);
+          if (data.username) setUsername(data.username);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [cookbookId, selectedId]);
+  }, [cookbookId, selectedId, access]);
 
   useEffect(() => {
     setLoading(false);
-  }, [cookbook, recipes]);
+  }, [cookbook, recipes, access]);
 
   useEffect(() => {
     if (selectedId) {
@@ -100,11 +188,41 @@ export function CookbookBrowser({
     [recipes, selectedId]
   );
 
-  if (notFound || !cookbook) {
+  if (access === "unauth") {
+    const next = `/cookbook/${cookbookId}`;
+    return (
+      <PaperSheet className="text-center space-y-3">
+        <p className="muted">Log in to view this cookbook.</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn-primary">
+            Log in
+          </Link>
+          <Link href={`/signup?next=${encodeURIComponent(next)}`} className="btn-secondary">
+            Sign up
+          </Link>
+        </div>
+      </PaperSheet>
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <PaperSheet className="text-center space-y-3">
+        <p className="muted">
+          This cookbook is invite-only. Ask the owner for an invite link to join.
+        </p>
+        <Link href="/my-cookbooks" className="text-sage hover:underline inline-block">
+          My cookbooks
+        </Link>
+      </PaperSheet>
+    );
+  }
+
+  if (access === "missing" || !cookbook) {
     return (
       <PaperSheet className="text-center">
-        <p className="muted">{notFound ? "Cookbook not found." : "Loading…"}</p>
-        {notFound && (
+        <p className="muted">{access === "missing" ? "Cookbook not found." : "Loading…"}</p>
+        {access === "missing" && (
           <Link href="/" className="text-sage hover:underline mt-3 inline-block">
             Go home
           </Link>
@@ -126,7 +244,6 @@ export function CookbookBrowser({
               <p className="muted text-sm sm:text-base">
                 {cookbook.creatorName && `Created by ${cookbook.creatorName} · `}
                 {cookbook.recipeCount} recipe{cookbook.recipeCount !== 1 ? "s" : ""}
-                {allowSubmit ? " · You can add recipes" : " · View only"}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -138,42 +255,40 @@ export function CookbookBrowser({
                 className="field flex-1"
                 enterKeyHint="search"
               />
-              {allowSubmit && (
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(true)}
-                  className="btn-primary whitespace-nowrap"
-                >
-                  Add recipe
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowAddForm(true)}
+                className="btn-primary whitespace-nowrap"
+              >
+                Add recipe
+              </button>
             </div>
           </div>
         </PaperSheet>
       </div>
 
-      {allowSubmit && showAddForm && submitToken && (
+      {showAddForm && (
         <AddRecipeForm
           cookbookId={cookbookId}
-          contributeToken={submitToken}
+          username={username}
           onClose={() => setShowAddForm(false)}
-          onSuccess={() => {
+          onSuccess={(recipeId) => {
             setShowAddForm(false);
             loadCookbook();
-            loadRecipes();
+            loadRecipes().then(() => {
+              if (recipeId) setSelectedId(recipeId);
+            });
           }}
         />
       )}
 
       {recipes.length === 0 && !loading ? (
         <PaperSheet>
-          <p className="muted text-center py-4">
-            {allowSubmit ? "No recipes yet. Add the first one!" : "No recipes yet."}
-          </p>
+          <p className="muted">No recipes yet. Add the first one for your group.</p>
         </PaperSheet>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ul className={`space-y-2 ${showRecipePane ? "hidden md:block" : "block"}`}>
+        <div className="grid md:grid-cols-[minmax(0,14rem)_1fr] gap-4 items-start">
+          <ul className={showRecipePane ? "hidden md:block space-y-1" : "space-y-1"}>
             {recipes.map((r) => (
               <li key={r.id}>
                 <button
@@ -191,13 +306,45 @@ export function CookbookBrowser({
           <div className={showRecipePane ? "block" : "hidden md:block"}>
             {detail ? (
               <RecipePage
+                cookbookId={cookbookId}
                 detail={detail}
+                username={username || detail.username || ""}
                 onBack={() => setSelectedId(null)}
                 showBack
                 onSwipeNext={() => goRelative(1)}
                 onSwipePrev={() => goRelative(-1)}
                 hasNext={selectedIndex >= 0 && selectedIndex < recipes.length - 1}
                 hasPrev={selectedIndex > 0}
+                onNotesChanged={(notes) =>
+                  setDetail((prev) => (prev ? { ...prev, notes } : prev))
+                }
+                onRecipeUpdated={(updated) => {
+                  setDetail((prev) => (prev ? { ...prev, ...updated } : prev));
+                  setRecipes((prev) =>
+                    prev.map((r) =>
+                      r.id === updated.id
+                        ? { ...r, name: updated.name, submitterName: updated.submitterName }
+                        : r
+                    )
+                  );
+                }}
+                onCooksChanged={(cooks) =>
+                  setDetail((prev) => {
+                    if (!prev) return prev;
+                    const ratingSum = cooks.reduce((s, c) => s + c.rating, 0);
+                    return {
+                      ...prev,
+                      cooks,
+                      timesCooked: cooks.length,
+                      lastCookedAt: cooks[0]?.cookedAt ?? null,
+                      cookedBy: Array.from(new Set(cooks.map((c) => c.cookName))),
+                      averageRating:
+                        cooks.length > 0
+                          ? Math.round((ratingSum / cooks.length) * 10) / 10
+                          : null,
+                    };
+                  })
+                }
               />
             ) : selectedId ? (
               <RecipePanel>
@@ -216,24 +363,153 @@ export function CookbookBrowser({
 }
 
 function RecipePage({
+  cookbookId,
   detail,
+  username,
   onBack,
   showBack,
   onSwipeNext,
   onSwipePrev,
   hasNext,
   hasPrev,
+  onNotesChanged,
+  onCooksChanged,
+  onRecipeUpdated,
 }: {
+  cookbookId: string;
   detail: RecipeDetail;
+  username: string;
   onBack: () => void;
   showBack: boolean;
   onSwipeNext: () => void;
   onSwipePrev: () => void;
   hasNext: boolean;
   hasPrev: boolean;
+  onNotesChanged: (notes: RecipeNote[]) => void;
+  onCooksChanged: (cooks: RecipeCook[]) => void;
+  onRecipeUpdated: (updated: {
+    id: string;
+    name: string;
+    submitterName: string;
+    ingredients: string;
+    instructions: string;
+    lastEditedBy?: string | null;
+  }) => void;
 }) {
   const steps = parseInstructions(detail.instructions);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const notes = detail.notes ?? [];
+  const cooks = detail.cooks ?? [];
+  const timesCooked = detail.timesCooked ?? cooks.length;
+  const cookedBy = detail.cookedBy ?? Array.from(new Set(cooks.map((c) => c.cookName)));
+  const lastCookedAt = detail.lastCookedAt ?? cooks[0]?.cookedAt ?? null;
+  const averageRating =
+    detail.averageRating ??
+    (cooks.length
+      ? Math.round((cooks.reduce((s, c) => s + c.rating, 0) / cooks.length) * 10) / 10
+      : null);
+  const canEdit = Boolean(detail.canEdit);
+
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(detail.name);
+  const [editIngredients, setEditIngredients] = useState(detail.ingredients);
+  const [editSteps, setEditSteps] = useState<string[]>(
+    steps.length > 0 ? steps : [""]
+  );
+  const [editError, setEditError] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  const [noteBody, setNoteBody] = useState("");
+  const [noteError, setNoteError] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [cookPhotos, setCookPhotos] = useState<File[]>([]);
+  const [cookPhotoPreviews, setCookPhotoPreviews] = useState<string[]>([]);
+  const [cookError, setCookError] = useState("");
+  const [cookSaving, setCookSaving] = useState(false);
+  const [cookJustSaved, setCookJustSaved] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [addingPhotosCookId, setAddingPhotosCookId] = useState<string | null>(null);
+  const addPhotosInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingAddCookId = useRef<string | null>(null);
+
+  const currentUserId = detail.userId ?? "";
+  const isCookbookOwner = detail.role === "owner";
+
+  useEffect(() => {
+    const urls = cookPhotos.map((f) => URL.createObjectURL(f));
+    setCookPhotoPreviews(urls);
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [cookPhotos]);
+
+  useEffect(() => {
+    if (!editing) {
+      setEditName(detail.name);
+      setEditIngredients(detail.ingredients);
+      const parsed = parseInstructions(detail.instructions);
+      setEditSteps(parsed.length > 0 ? parsed : [""]);
+    }
+  }, [detail, editing]);
+
+  function pickCookPhotos(files: FileList | null) {
+    if (!files) return;
+    const next = [...cookPhotos, ...Array.from(files)].slice(0, 6);
+    setCookPhotos(next);
+  }
+
+  function removeCookPhoto(index: number) {
+    setCookPhotos((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function startEdit() {
+    const parsed = parseInstructions(detail.instructions);
+    setEditName(detail.name);
+    setEditIngredients(detail.ingredients);
+    setEditSteps(parsed.length > 0 ? parsed : [""]);
+    setEditError("");
+    setEditing(true);
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setEditError("");
+    if (!editName.trim()) {
+      setEditError("Recipe name is required.");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/cookbooks/${cookbookId}/recipes/${detail.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName.trim(),
+          ingredients: editIngredients.trim(),
+          instructions: serializeInstructions(editSteps),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(data.error ?? "Could not save.");
+        return;
+      }
+      onRecipeUpdated({
+        id: data.id,
+        name: data.name,
+        submitterName: data.submitterName,
+        ingredients: data.ingredients,
+        instructions: data.instructions,
+        lastEditedBy: data.lastEditedBy,
+      });
+      setEditing(false);
+    } catch {
+      setEditError("Network error.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
 
   function onTouchStart(e: React.TouchEvent) {
     const t = e.changedTouches[0];
@@ -247,10 +523,130 @@ function RecipePage({
     const dy = t.clientY - touchStart.current.y;
     touchStart.current = null;
     if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
-    // Conventional: swipe left → next, swipe right → previous
     if (dx < 0 && hasNext) onSwipeNext();
     if (dx > 0 && hasPrev) onSwipePrev();
   }
+
+  async function submitCook(e: React.FormEvent) {
+    e.preventDefault();
+    setCookError("");
+    setCookJustSaved(false);
+    if (rating < 1 || rating > 5) {
+      setCookError("Pick a rating from 1 to 5 stars.");
+      return;
+    }
+    setCookSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append("rating", String(rating));
+      for (const file of cookPhotos) {
+        formData.append("photos", file);
+      }
+      const res = await fetch(`/api/cookbooks/${cookbookId}/recipes/${detail.id}/cooks`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCookError(data.error ?? "Could not log this cook.");
+        return;
+      }
+      onCooksChanged([data, ...cooks]);
+      setRating(0);
+      setCookPhotos([]);
+      setCookJustSaved(true);
+      setTimeout(() => setCookJustSaved(false), 2500);
+    } catch {
+      setCookError("Network error.");
+    } finally {
+      setCookSaving(false);
+    }
+  }
+
+  function openAddPhotos(cookId: string) {
+    pendingAddCookId.current = cookId;
+    addPhotosInputRef.current?.click();
+  }
+
+  async function onAddPhotosSelected(files: FileList | null) {
+    const cookId = pendingAddCookId.current;
+    pendingAddCookId.current = null;
+    if (!cookId || !files || files.length === 0) return;
+    setAddingPhotosCookId(cookId);
+    setCookError("");
+    try {
+      const formData = new FormData();
+      for (const file of Array.from(files).slice(0, 6)) {
+        formData.append("photos", file);
+      }
+      const res = await fetch(
+        `/api/cookbooks/${cookbookId}/recipes/${detail.id}/cooks/${cookId}/photos`,
+        { method: "POST", body: formData }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setCookError(data.error ?? "Could not add photos.");
+        return;
+      }
+      onCooksChanged(
+        cooks.map((c) => (c.id === cookId ? { ...c, photos: data.photos } : c))
+      );
+    } catch {
+      setCookError("Network error.");
+    } finally {
+      setAddingPhotosCookId(null);
+    }
+  }
+
+  async function deletePhoto(cookId: string, photoId: string) {
+    if (!confirm("Delete this photo?")) return;
+    const res = await fetch(
+      `/api/cookbooks/${cookbookId}/recipes/${detail.id}/cooks/${cookId}/photos/${photoId}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setCookError(data.error ?? "Could not delete photo.");
+      return;
+    }
+    onCooksChanged(
+      cooks.map((c) =>
+        c.id === cookId
+          ? { ...c, photos: (c.photos ?? []).filter((p) => p.id !== photoId) }
+          : c
+      )
+    );
+  }
+
+  async function submitNote(e: React.FormEvent) {
+    e.preventDefault();
+    setNoteError("");
+    if (!noteBody.trim()) {
+      setNoteError("Write a short note.");
+      return;
+    }
+    setNoteSaving(true);
+    try {
+      const res = await fetch(`/api/cookbooks/${cookbookId}/recipes/${detail.id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: noteBody.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNoteError(data.error ?? "Could not save note.");
+        return;
+      }
+      onNotesChanged([...notes, data]);
+      setNoteBody("");
+    } catch {
+      setNoteError("Network error.");
+    } finally {
+      setNoteSaving(false);
+    }
+  }
+
+  const addedDate = formatRecipeDate(detail.createdAt);
 
   return (
     <div className="space-y-3" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
@@ -265,24 +661,312 @@ function RecipePage({
       )}
       <RecipePanel className="min-h-[70vh] sm:min-h-[28rem]">
         <h2 className="recipe-panel-title">{detail.name}</h2>
-        <p className="recipe-panel-byline">by {detail.submitterName}</p>
-        <p className="recipe-swipe-hint">Swipe left or right for more recipes</p>
-
-        <h3 className="recipe-panel-section">Ingredients</h3>
-        <pre className="recipe-panel-body">{detail.ingredients || "—"}</pre>
-
-        <h3 className="recipe-panel-section">Instructions</h3>
-        {steps.length === 0 ? (
-          <p className="muted">—</p>
+        <div className="recipe-panel-meta">
+          <div>
+            Added by <strong>{detail.submitterName}</strong>
+          </div>
+          {addedDate && <div>Added {addedDate}</div>}
+          {detail.lastEditedBy && (
+            <div>
+              Last edited by <strong>{detail.lastEditedBy}</strong>
+            </div>
+          )}
+          <div>
+            Cooked <strong>{timesCooked}</strong> time{timesCooked === 1 ? "" : "s"}
+            {averageRating != null ? ` · Avg ${averageRating}★` : ""}
+            {lastCookedAt ? ` · Last cooked ${formatRecipeDate(lastCookedAt)}` : ""}
+          </div>
+          {cookedBy.length > 0 && (
+            <div>
+              Who&apos;s cooked it: <strong>{cookedBy.join(", ")}</strong>
+            </div>
+          )}
+        </div>
+        {canEdit && !editing && (
+          <div className="mb-3">
+            <button type="button" onClick={startEdit} className="btn-secondary text-sm">
+              Edit recipe
+            </button>
+          </div>
+        )}
+        {editing ? (
+          <form onSubmit={saveEdit} className="space-y-4 mb-6">
+            <div>
+              <label className="label">Recipe name</label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="field"
+                maxLength={200}
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Ingredients</label>
+              <textarea
+                value={editIngredients}
+                onChange={(e) => setEditIngredients(e.target.value)}
+                rows={4}
+                className="field min-h-[6rem] resize-y"
+                maxLength={8000}
+              />
+            </div>
+            <div>
+              <label className="label">Instructions</label>
+              <div className="space-y-2 mt-2">
+                {editSteps.map((step, index) => (
+                  <div key={index} className="flex gap-2 items-start">
+                    <span className="flex-shrink-0 w-7 h-11 flex items-center justify-center muted text-sm">
+                      {index + 1}.
+                    </span>
+                    <input
+                      type="text"
+                      value={step}
+                      onChange={(e) => {
+                        const next = [...editSteps];
+                        next[index] = e.target.value;
+                        setEditSteps(next);
+                      }}
+                      className="field flex-1"
+                      maxLength={2000}
+                    />
+                    <button
+                      type="button"
+                      disabled={editSteps.length <= 1}
+                      onClick={() => setEditSteps((prev) => prev.filter((_, i) => i !== index))}
+                      className="text-sm text-red-700 disabled:opacity-40 min-h-11 px-2"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setEditSteps((prev) => [...prev, ""])}
+                  className="btn-secondary text-sm"
+                >
+                  Add step
+                </button>
+              </div>
+            </div>
+            {editError && (
+              <p className="text-red-700 text-sm" role="alert">
+                {editError}
+              </p>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button type="submit" disabled={editSaving} className="btn-primary">
+                {editSaving ? "Saving…" : "Save changes"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         ) : (
-          <ol className="recipe-panel-steps">
-            {steps.map((step, i) => (
-              <li key={i} className="recipe-panel-step">
-                <span className="recipe-panel-step-num">{i + 1}</span>
-                <span className="recipe-panel-step-text">{step}</span>
-              </li>
-            ))}
-          </ol>
+          <>
+            <p className="recipe-swipe-hint">Swipe left or right for more recipes</p>
+
+            <section className="recipe-cook-log">
+              <h3 className="recipe-panel-section" style={{ marginTop: 0 }}>
+                I made this
+              </h3>
+              <p className="muted text-sm mb-2">
+                Logging as <strong className="text-ink">{username || "you"}</strong> — rate how it
+                turned out. Photos are optional.
+              </p>
+              <form onSubmit={submitCook} className="recipe-cook-form-stack">
+                <StarRating value={rating} onChange={setRating} />
+                <div className="cook-photo-picker">
+                  <label className="btn-secondary text-sm self-start cursor-pointer">
+                    Add photos
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic"
+                      multiple
+                      className="sr-only"
+                      onChange={(e) => {
+                        pickCookPhotos(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <span className="text-xs muted">Up to 6 · 4MB each</span>
+                </div>
+                {cookPhotoPreviews.length > 0 && (
+                  <ul className="cook-photo-thumbs">
+                    {cookPhotoPreviews.map((src, i) => (
+                      <li key={src} className="cook-photo-thumb">
+                        <img src={src} alt="" />
+                        <button
+                          type="button"
+                          className="cook-photo-remove"
+                          onClick={() => removeCookPhoto(i)}
+                          aria-label="Remove photo"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <button type="submit" disabled={cookSaving} className="btn-primary self-start">
+                  {cookSaving ? "Saving…" : cookJustSaved ? "Logged!" : "I made this"}
+                </button>
+              </form>
+              {cookError && (
+                <p className="text-red-700 text-sm mt-2" role="alert">
+                  {cookError}
+                </p>
+              )}
+              <input
+                ref={addPhotosInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  onAddPhotosSelected(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              {cooks.length > 0 && (
+                <ul className="recipe-cook-history">
+                  {cooks.slice(0, 8).map((c) => {
+                    const photos = c.photos ?? [];
+                    const canManage =
+                      (currentUserId && c.userId === currentUserId) || isCookbookOwner;
+                    return (
+                      <li key={c.id} className="recipe-cook-history-block">
+                        <div className="recipe-cook-history-item">
+                          <span>
+                            <strong>{c.cookName}</strong> cooked this ·{" "}
+                            {formatRecipeDate(c.cookedAt)}
+                          </span>
+                          <StarRating value={c.rating} readOnly size="sm" />
+                        </div>
+                        {photos.length > 0 && (
+                          <ul className="cook-photo-thumbs">
+                            {photos.map((p) => (
+                              <li key={p.id} className="cook-photo-thumb">
+                                <button
+                                  type="button"
+                                  className="cook-photo-open"
+                                  onClick={() => setLightboxUrl(p.url)}
+                                >
+                                  <img src={p.url} alt={`Result by ${c.cookName}`} />
+                                </button>
+                                {canManage && (
+                                  <button
+                                    type="button"
+                                    className="cook-photo-remove"
+                                    onClick={() => deletePhoto(c.id, p.id)}
+                                    aria-label="Delete photo"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {canManage && photos.length < 6 && (
+                          <button
+                            type="button"
+                            className="btn-ghost text-sm self-start px-0"
+                            disabled={addingPhotosCookId === c.id}
+                            onClick={() => openAddPhotos(c.id)}
+                          >
+                            {addingPhotosCookId === c.id ? "Uploading…" : "Add photos"}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            {lightboxUrl && (
+              <div
+                className="cook-lightbox"
+                role="dialog"
+                aria-modal="true"
+                onClick={() => setLightboxUrl(null)}
+              >
+                <img src={lightboxUrl} alt="Cook result" onClick={(e) => e.stopPropagation()} />
+                <button
+                  type="button"
+                  className="btn-secondary cook-lightbox-close"
+                  onClick={() => setLightboxUrl(null)}
+                >
+                  Close
+                </button>
+              </div>
+            )}
+
+            <h3 className="recipe-panel-section">Ingredients</h3>
+            <pre className="recipe-panel-body">{detail.ingredients || "—"}</pre>
+
+            <h3 className="recipe-panel-section">Instructions</h3>
+            {steps.length === 0 ? (
+              <p className="muted">—</p>
+            ) : (
+              <ol className="recipe-panel-steps">
+                {steps.map((step, i) => (
+                  <li key={i} className="recipe-panel-step">
+                    <span className="recipe-panel-step-num">{i + 1}</span>
+                    <span className="recipe-panel-step-text">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            <section className="recipe-notes">
+              <h3 className="recipe-panel-section" style={{ marginTop: 0 }}>
+                Cooking notes
+              </h3>
+              <p className="muted text-sm mb-2">
+                Tips from your group — what you changed, what worked, what to try next.
+              </p>
+              {notes.length === 0 ? (
+                <p className="muted text-sm">No notes yet. Be the first to leave one.</p>
+              ) : (
+                notes.map((n) => (
+                  <div key={n.id} className="recipe-note">
+                    <p className="recipe-note-author">{n.authorName}&apos;s notes:</p>
+                    <p className="recipe-note-body">&ldquo;{n.body}&rdquo;</p>
+                    <p className="recipe-note-date">{formatRecipeDate(n.createdAt)}</p>
+                  </div>
+                ))
+              )}
+              <form onSubmit={submitNote} className="recipe-notes-form">
+                <p className="text-sm muted">
+                  Posting as <strong className="text-ink">{username || "you"}</strong>
+                </p>
+                <textarea
+                  value={noteBody}
+                  onChange={(e) => setNoteBody(e.target.value)}
+                  className="field min-h-[5rem] resize-y"
+                  placeholder="e.g. I used 1.5x the garlic and it was way better."
+                  maxLength={2000}
+                />
+                {noteError && (
+                  <p className="text-red-700 text-sm" role="alert">
+                    {noteError}
+                  </p>
+                )}
+                <button type="submit" disabled={noteSaving} className="btn-primary self-start">
+                  {noteSaving ? "Saving…" : "Add note"}
+                </button>
+              </form>
+            </section>
+          </>
         )}
       </RecipePanel>
     </div>
@@ -291,30 +975,24 @@ function RecipePage({
 
 function AddRecipeForm({
   cookbookId,
-  contributeToken,
+  username,
   onClose,
   onSuccess,
 }: {
   cookbookId: string;
-  contributeToken: string;
+  username: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (recipeId?: string) => void;
 }) {
-  const [submitterName, setSubmitterName] = useState("");
   const [name, setName] = useState("");
   const [ingredients, setIngredients] = useState("");
   const [steps, setSteps] = useState<string[]>([""]);
   const [error, setError] = useState("");
-  const [editLink, setEditLink] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!submitterName.trim()) {
-      setError("Your name is required.");
-      return;
-    }
     if (!name.trim()) {
       setError("Recipe name is required.");
       return;
@@ -325,8 +1003,6 @@ function AddRecipeForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contributeToken,
-          submitterName: submitterName.trim(),
           name: name.trim(),
           ingredients: ingredients.trim(),
           instructions: serializeInstructions(steps),
@@ -337,8 +1013,7 @@ function AddRecipeForm({
         setError(data.error ?? "Something went wrong.");
         return;
       }
-      const base = typeof window !== "undefined" ? window.location.origin : "";
-      setEditLink(`${base}/recipe/${data.id}/edit?token=${data.editToken}`);
+      onSuccess(data.id);
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -346,49 +1021,13 @@ function AddRecipeForm({
     }
   }
 
-  if (editLink) {
-    return (
-      <PaperSheet className="space-y-3">
-        <p className="display-title text-xl text-ink">Recipe added.</p>
-        <p className="text-sm muted">
-          Save this link if you want to edit later. The cookbook admin can also send you an edit
-          link anytime.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input readOnly value={editLink} className="field flex-1 text-sm" />
-          <button
-            type="button"
-            onClick={() => navigator.clipboard.writeText(editLink)}
-            className="btn-primary shrink-0"
-          >
-            Copy
-          </button>
-        </div>
-        <button type="button" onClick={onSuccess} className="btn-primary">
-          Done
-        </button>
-      </PaperSheet>
-    );
-  }
-
   return (
     <PaperSheet>
       <h2 className="display-title text-xl text-ink mb-4">Add a recipe</h2>
+      <p className="muted text-sm mb-4">
+        Adding as <strong className="text-ink">{username || "you"}</strong>
+      </p>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="label">
-            Your name <span className="text-coral">*</span>
-          </label>
-          <input
-            type="text"
-            value={submitterName}
-            onChange={(e) => setSubmitterName(e.target.value)}
-            className="field"
-            maxLength={80}
-            required
-            autoComplete="name"
-          />
-        </div>
         <div>
           <label className="label">
             Recipe name <span className="text-coral">*</span>

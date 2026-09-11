@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { clearCreatorCookie } from "@/lib/auth";
+import { clearUserCookie } from "@/lib/auth";
 
+/** @deprecated Use /api/auth/logout */
 export async function POST() {
-  await clearCreatorCookie();
+  await clearUserCookie();
   return NextResponse.json({ ok: true });
 }

@@ -1,23 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+/** Legacy contribute token check → maps to invite token. */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  const { id: cookbookId } = await params;
   const url = new URL(request.url);
   const token = url.searchParams.get("token") ?? "";
 
   const cookbook = await prisma.cookbook.findUnique({
-    where: { id },
-    select: { id: true, contributeToken: true },
+    where: { id: cookbookId },
+    select: { id: true, inviteToken: true },
   });
-  if (!cookbook) {
-    return NextResponse.json({ error: "Cookbook not found." }, { status: 404 });
+  if (!cookbook || !token || cookbook.inviteToken !== token) {
+    return NextResponse.json({ error: "Invalid invite link." }, { status: 404 });
   }
-  if (!token || cookbook.contributeToken !== token) {
-    return NextResponse.json({ error: "Invalid contribute link." }, { status: 403 });
-  }
+
   return NextResponse.json({ ok: true });
 }
